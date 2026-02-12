@@ -1,0 +1,33 @@
+name: V8VMac
+options:
+  bundleIdPrefix: io.v8v.example
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+
+targets:
+  V8VMac:
+    type: application
+    platform: macOS
+    sources:
+      - V8VMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.v8v.example.mac
+        INFOPLIST_FILE: V8VMac/Info.plist
+        CODE_SIGN_ENTITLEMENTS: V8VMac/V8VMac.entitlements
+        CODE_SIGN_STYLE: Automatic
+        FRAMEWORK_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)/../core/build/XCFrameworks/release"
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - framework: "../core/build/XCFrameworks/release/V8VCore.xcframework"
+        embed: true

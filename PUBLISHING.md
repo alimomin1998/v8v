@@ -23,8 +23,8 @@ This document explains how to publish V8V to all distribution channels.
    - Go to https://issues.sonatype.org
    - Create New Issue → Community Support → New Project
    - Group Id: `io.v8v`
-   - Project URL: `https://github.com/AliHaider-codes/v8v`
-   - SCM URL: `https://github.com/AliHaider-codes/v8v.git`
+   - Project URL: `https://github.com/alimomin1998/v8v`
+   - SCM URL: `https://github.com/alimomin1998/v8v.git`
 3. **Generate GPG key** (for signing artifacts):
    ```bash
    gpg --gen-key
@@ -94,7 +94,7 @@ npm publish --access public
 
 ```bash
 # Build XCFramework
-./gradlew assembleV8VCoreXCFrameworkRelease
+./gradlew assembleV8VCoreReleaseXCFramework
 
 # Zip it
 cd core/build/XCFrameworks/release

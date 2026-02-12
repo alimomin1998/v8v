@@ -34,5 +34,10 @@ secring.gpg
 # Release artifacts
 *.xcframework.zip
 
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
 # OS
 Thumbs.db

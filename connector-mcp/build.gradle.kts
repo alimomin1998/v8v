@@ -6,6 +6,8 @@ plugins {
 }
 
 kotlin {
+    applyDefaultHierarchyTemplate()
+
     androidTarget {
         compilations.all {
             kotlinOptions {
@@ -49,21 +51,12 @@ kotlin {
             }
         }
 
-        // Shared Apple source set for iOS + macOS
-        val appleMain by creating {
-            dependsOn(commonMain.get())
+        // With applyDefaultHierarchyTemplate=true, appleMain is auto-created
+        val appleMain by getting {
             dependencies {
                 implementation(libs.ktor.client.darwin)
             }
         }
-        val iosMain by creating { dependsOn(appleMain) }
-        val iosArm64Main by getting { dependsOn(iosMain) }
-        val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
-        val iosX64Main by getting { dependsOn(iosMain) }
-
-        val macosMain by creating { dependsOn(appleMain) }
-        val macosArm64Main by getting { dependsOn(macosMain) }
-        val macosX64Main by getting { dependsOn(macosMain) }
     }
 }
 

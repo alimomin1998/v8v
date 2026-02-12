@@ -1,5 +1,7 @@
 package io.v8v.core
 
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.get
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -17,26 +19,20 @@ import kotlin.math.log10
 import kotlin.math.sqrt
 
 /**
- * Apple platform implementation of [SpeechRecognitionEngine] using the Speech framework.
+ * iOS implementation of [SpeechRecognitionEngine] using the Speech framework.
  *
- * Works on both **iOS** and **macOS** — uses [SFSpeechRecognizer] for speech-to-text
- * and [AVAudioEngine] for audio input. Both APIs are available on iOS 10+ and macOS 10.15+.
+ * Uses [SFSpeechRecognizer] for speech-to-text, [AVAudioEngine] for audio input,
+ * and [AVAudioSession] for managing the recording session.
  *
- * Maps recognition results to the framework's [SpeechEvent] sealed class:
- * - Partial transcripts -> [SpeechEvent.PartialResult]
- * - Final transcripts -> [SpeechEvent.FinalResult]
- * - Audio buffer RMS -> [SpeechEvent.RmsChanged] (pre-normalized to 0.0-1.0)
- * - Errors -> [SpeechEvent.Error]
+ * IMPORTANT: The audio engine must be started BEFORE the recognition task,
+ * otherwise the recognition task times out waiting for audio and cancels.
  *
- * **Requirements (iOS):**
+ * **Requirements:**
  * - `NSSpeechRecognitionUsageDescription` in Info.plist
  * - `NSMicrophoneUsageDescription` in Info.plist
- *
- * **Requirements (macOS):**
- * - Microphone entitlement (`com.apple.security.device.audio-input`)
- * - `NSSpeechRecognitionUsageDescription` in Info.plist
  */
-class AppleSpeechEngine : SpeechRecognitionEngine {
+@OptIn(ExperimentalForeignApi::class)
+class IosSpeechEngine : SpeechRecognitionEngine {
 
     private val _events = MutableSharedFlow<SpeechEvent>(extraBufferCapacity = 64)
     override val events: SharedFlow<SpeechEvent> = _events.asSharedFlow()
@@ -49,8 +45,10 @@ class AppleSpeechEngine : SpeechRecognitionEngine {
     private var recognitionTask: SFSpeechRecognitionTask? = null
     private var speechRecognizer: SFSpeechRecognizer? = null
 
+    /** Guard against re-entrant stopListening calls. */
+    private var isStopping = false
+
     override fun startListening(language: String) {
-        // Cancel any existing task
         stopListening()
 
         val locale = NSLocale(localeIdentifier = language)
@@ -66,33 +64,72 @@ class AppleSpeechEngine : SpeechRecognitionEngine {
             return
         }
 
-        // Configure audio session.
-        // On iOS, setCategory is needed to select the recording category.
-        // On macOS, AVAudioSession exists but category management works differently.
-        // We wrap in try/catch to handle both platforms gracefully.
+        // Configure audio session for recording on iOS
         try {
             val audioSession = AVAudioSession.sharedInstance()
             audioSession.setActive(true, error = null)
         } catch (_: Exception) {
-            // macOS may not require explicit audio session activation — continue.
+            // Continue even if session activation fails
         }
 
+        // Create recognition request
         val request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
+        if (speechRecognizer?.supportsOnDeviceRecognition() == true) {
+            request.requiresOnDeviceRecognition = true
+        }
         recognitionRequest = request
 
+        // ── Step 1: Set up audio engine and install tap FIRST ──
         val engine = AVAudioEngine()
         audioEngine = engine
 
+        val inputNode = engine.inputNode
+        val recordingFormat = inputNode.outputFormatForBus(0u)
+
+        inputNode.installTapOnBus(0u, bufferSize = 4096u, format = recordingFormat) { buffer, _ ->
+            if (buffer != null) {
+                recognitionRequest?.appendAudioPCMBuffer(buffer)
+
+                val channelData = buffer.floatChannelData
+                if (channelData != null) {
+                    val frameLength = buffer.frameLength.toInt()
+                    val samples = channelData[0]
+                    if (samples != null && frameLength > 0) {
+                        var sumSquares = 0.0f
+                        for (i in 0 until frameLength) {
+                            val sample = samples[i]
+                            sumSquares += sample * sample
+                        }
+                        val rms = sqrt(sumSquares / frameLength)
+                        val rmsdB = if (rms > 0f) 20f * log10(rms) else -160f
+                        val normalized = ((rmsdB + 50f).coerceIn(0f, 50f)) / 50f
+                        _events.tryEmit(SpeechEvent.RmsChanged(normalized))
+                    }
+                }
+            }
+        }
+
+        // ── Step 2: Start the audio engine so audio is flowing ──
+        engine.prepare()
+        try {
+            engine.startAndReturnError(null)
+        } catch (e: Exception) {
+            _events.tryEmit(SpeechEvent.Error(code = -3, message = "Audio engine start failed: ${e.message}"))
+            return
+        }
+
+        // ── Step 3: Start recognition task AFTER audio is already flowing ──
         recognitionTask = speechRecognizer!!.recognitionTaskWithRequest(request) { result, error ->
             if (error != null) {
+                // Only emit the error — do NOT call stopListening() here.
+                // The VoiceAgent decides whether to restart or stop.
                 _events.tryEmit(
                     SpeechEvent.Error(
                         code = error.code.toInt(),
                         message = error.localizedDescription ?: "Recognition error",
                     ),
                 )
-                stopListening()
                 return@recognitionTaskWithRequest
             }
 
@@ -106,47 +143,15 @@ class AppleSpeechEngine : SpeechRecognitionEngine {
             }
         }
 
-        // Install audio tap to feed audio buffers and extract RMS
-        val inputNode = engine.inputNode
-        val recordingFormat = inputNode.outputFormatForBus(0u)
-
-        inputNode.installTapOnBus(0u, bufferSize = 1024u, format = recordingFormat) { buffer, _ ->
-            if (buffer != null) {
-                recognitionRequest?.appendAudioPCMBuffer(buffer)
-
-                // Calculate RMS from the first channel
-                val channelData = buffer.floatChannelData
-                if (channelData != null) {
-                    val frameLength = buffer.frameLength.toInt()
-                    val samples = channelData[0]
-                    if (samples != null && frameLength > 0) {
-                        var sumSquares = 0.0f
-                        for (i in 0 until frameLength) {
-                            val sample = samples[i]
-                            sumSquares += sample * sample
-                        }
-                        val rms = sqrt(sumSquares / frameLength)
-                        val rmsdB = if (rms > 0f) 20f * log10(rms) else -160f
-                        // Apple's AVAudioEngine RMS typically ranges from -50 to 0 dB.
-                        // Normalize to 0.0-1.0 before emitting.
-                        val normalized = ((rmsdB + 50f).coerceIn(0f, 50f)) / 50f
-                        _events.tryEmit(SpeechEvent.RmsChanged(normalized))
-                    }
-                }
-            }
-        }
-
-        engine.prepare()
-        try {
-            engine.startAndReturnError(null)
-            _isListening.value = true
-            _events.tryEmit(SpeechEvent.ReadyForSpeech)
-        } catch (e: Exception) {
-            _events.tryEmit(SpeechEvent.Error(code = -3, message = "Audio engine start failed: ${e.message}"))
-        }
+        _isListening.value = true
+        _events.tryEmit(SpeechEvent.ReadyForSpeech)
     }
 
     override fun stopListening() {
+        // Guard against re-entrant calls
+        if (isStopping) return
+        isStopping = true
+
         audioEngine?.stop()
         audioEngine?.inputNode?.removeTapOnBus(0u)
         audioEngine = null
@@ -158,7 +163,8 @@ class AppleSpeechEngine : SpeechRecognitionEngine {
         recognitionTask = null
 
         _isListening.value = false
-        _events.tryEmit(SpeechEvent.EndOfSpeech)
+
+        isStopping = false
     }
 
     override fun destroy() {

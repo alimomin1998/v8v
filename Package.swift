@@ -8,7 +8,7 @@ import PackageDescription
 //   File → Add Package Dependencies → paste repo URL
 //
 // For LOCAL DEVELOPMENT: build the XCFramework first:
-//   ./gradlew assembleV8VCoreXCFrameworkRelease
+//   ./gradlew assembleV8VCoreReleaseXCFramework
 //
 // The release script (scripts/release.sh) will:
 //   1. Build the XCFramework
@@ -37,7 +37,7 @@ let package = Package(
 
         // .binaryTarget(
         //     name: "V8VCore",
-        //     url: "https://github.com/AliHaider-codes/v8v/releases/download/v0.1.0/V8VCore.xcframework.zip",
+        //     url: "https://github.com/alimomin1998/v8v/releases/download/v0.1.0/V8VCore.xcframework.zip",
         //     checksum: "CHECKSUM_FROM_RELEASE_SCRIPT"
         // ),
 

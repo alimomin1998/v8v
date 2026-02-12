@@ -1,5 +1,6 @@
 package io.v8v.core
 
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.suspendCancellableCoroutine
 import platform.AVFAudio.AVAudioSession
 import platform.Speech.SFSpeechRecognizer
@@ -7,24 +8,18 @@ import platform.Speech.SFSpeechRecognizerAuthorizationStatus
 import kotlin.coroutines.resume
 
 /**
- * Apple platform implementation of [PermissionHelper].
+ * iOS implementation of [PermissionHelper].
  *
- * Works on both **iOS** and **macOS**. Handles two permissions required
- * for voice recognition:
- * 1. **Microphone** -- via [AVAudioSession.requestRecordPermission]
- * 2. **Speech Recognition** -- via [SFSpeechRecognizer.requestAuthorization]
+ * Handles two permissions required for voice recognition:
+ * 1. **Microphone** — via [AVAudioSession.requestRecordPermission]
+ * 2. **Speech Recognition** — via [SFSpeechRecognizer.requestAuthorization]
  *
- * Both must be granted for speech recognition to work. The helper requests
- * both and returns [PermissionStatus.GRANTED] only if both are granted.
- *
- * **Info.plist keys required (iOS):**
+ * **Info.plist keys required:**
  * - `NSSpeechRecognitionUsageDescription`
  * - `NSMicrophoneUsageDescription`
- *
- * **Entitlements required (macOS):**
- * - `com.apple.security.device.audio-input`
  */
-class ApplePermissionHelper : PermissionHelper {
+@OptIn(ExperimentalForeignApi::class)
+class IosPermissionHelper : PermissionHelper {
 
     override suspend fun checkMicrophonePermission(): PermissionStatus {
         return when (SFSpeechRecognizer.authorizationStatus()) {

@@ -19,7 +19,7 @@ You need a public GitHub repo. SPM (Swift Package Manager) requires it to be pub
    - Do NOT initialize with README (you already have one)
 3. Click **Create repository**
 4. You will see a page with push instructions. Copy the repo URL, it looks like:
-   `https://github.com/AliHaider-codes/v8v.git`
+   `https://github.com/alimomin1998/v8v.git`
 
 ### 1.2 Push your code
 
@@ -36,7 +36,7 @@ git commit -m "Initial commit: V8V v0.1.0"
 
 git branch -M main
 
-git remote add origin https://github.com/AliHaider-codes/v8v.git
+git remote add origin https://github.com/alimomin1998/v8v.git
 
 git push -u origin main
 ```
@@ -280,7 +280,7 @@ Wait for `BUILD SUCCESSFUL`.
 ### 6.4 Test XCFramework build
 
 ```bash
-./gradlew assembleV8VCoreXCFrameworkRelease
+./gradlew assembleV8VCoreReleaseXCFramework
 ```
 
 Wait for `BUILD SUCCESSFUL`.
@@ -345,7 +345,7 @@ Open `Package.swift` in the project root. Find this section:
 ```swift
 // .binaryTarget(
 //     name: "V8VCore",
-//     url: "https://github.com/AliHaider-codes/v8v/releases/download/v0.1.0/V8VCore.xcframework.zip",
+//     url: "https://github.com/alimomin1998/v8v/releases/download/v0.1.0/V8VCore.xcframework.zip",
 //     checksum: "CHECKSUM_FROM_RELEASE_SCRIPT"
 // ),
 ```
@@ -355,7 +355,7 @@ Change it to (uncomment and fill in your checksum):
 ```swift
 .binaryTarget(
     name: "V8VCore",
-    url: "https://github.com/AliHaider-codes/v8v/releases/download/v0.1.0/V8VCore.xcframework.zip",
+    url: "https://github.com/alimomin1998/v8v/releases/download/v0.1.0/V8VCore.xcframework.zip",
     checksum: "PASTE_YOUR_ACTUAL_CHECKSUM_HERE"
 ),
 ```
@@ -415,7 +415,7 @@ You should see version 0.1.0 published.
 
 1. Open Xcode
 2. File → Add Package Dependencies
-3. Paste: `https://github.com/AliHaider-codes/v8v`
+3. Paste: `https://github.com/alimomin1998/v8v`
 4. It should find the package and show version 0.1.0
 
 ---

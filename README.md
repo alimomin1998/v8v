@@ -17,20 +17,20 @@ No audio upload by default. Everything runs on-device unless explicitly configur
 
 | Platform | Status | Engine | Distribution |
 |----------|--------|--------|-------------|
-| Android | ✅ Available | `android.speech.SpeechRecognizer` | Maven Central / Gradle |
-| iOS | ✅ Available | `SFSpeechRecognizer` + `AVAudioEngine` | XCFramework / SPM |
-| macOS | ✅ Available | `SFSpeechRecognizer` + `AVAudioEngine` | XCFramework / SPM |
-| Web | ✅ Available | Web Speech API | npm / `<script>` |
-| JVM (Desktop) | ✅ Core only | Bring your own engine | Maven Central |
-| Windows | 🔜 Planned | — | — |
-| Linux | 🔜 Planned | — | — |
+| Android | Available | `android.speech.SpeechRecognizer` | Maven Central / Gradle |
+| iOS | Available | `SFSpeechRecognizer` + `AVAudioEngine` | XCFramework / SPM |
+| macOS | Available | `SFSpeechRecognizer` + `AVAudioEngine` | XCFramework / SPM |
+| Web | Available | Web Speech API | npm / `<script>` |
+| JVM (Desktop) | Core only | Bring your own engine | Maven Central |
+| Windows | Planned | — | — |
+| Linux | Planned | — | — |
 
 ### Compatibility Matrix
 
 | Dependency | Minimum | Tested |
 |-----------|---------|--------|
 | **Android SDK** | API 24 (Android 7.0) | API 35 (Android 15) |
-| **iOS** | 15.0 | 17+ |
+| **iOS** | 16.0 | 17+ |
 | **macOS** | 13.0 (Ventura) | 14+ (Sonoma) |
 | **Web Browser** | Chrome 33+ / Edge 79+ | Chrome 120+ |
 | **Safari (Web)** | Not supported (no Web Speech API) | — |
@@ -50,15 +50,17 @@ graph TD
         VA[VoiceAgent] --> IR[IntentResolver]
         VA --> AR[ActionRouter]
         VA --> SE[SpeechRecognitionEngine]
+        VA --> CB[VoiceAgentCallbacks]
         AR --> LH[LocalActionHandler]
         AR --> MH[McpActionHandler]
         AR --> WH[WebhookActionHandler]
     end
 
     subgraph engines ["Platform Engines"]
-        SE --> Android[AndroidSpeechEngine]
-        SE --> Apple[AppleSpeechEngine]
-        SE --> Web[WebSpeechEngine]
+        SE --> AndroidEng[AndroidSpeechEngine]
+        SE --> IosEng[IosSpeechEngine]
+        SE --> MacosEng[MacosSpeechEngine]
+        SE --> WebEng[WebSpeechEngine]
     end
 
     subgraph connectors
@@ -72,11 +74,10 @@ graph TD
 ```mermaid
 graph TD
     commonMain --> androidMain
-    commonMain --> appleMain
+    commonMain --> iosMain
+    commonMain --> macosMain
     commonMain --> jvmMain
     commonMain --> jsMain
-    appleMain --> iosMain
-    appleMain --> macosMain
 ```
 
 ### Project Structure
@@ -84,17 +85,19 @@ graph TD
 ```
 v8v/
 ├── core/                  # Platform-agnostic: VoiceAgent, IntentResolver, ActionRouter
-│   ├── commonMain/        # Shared Kotlin code
+│   ├── commonMain/        # Shared Kotlin code + VoiceAgentCallbacks
 │   ├── androidMain/       # Android SpeechRecognizer
-│   ├── appleMain/         # iOS + macOS SFSpeechRecognizer
+│   ├── iosMain/           # iOS SFSpeechRecognizer + AVAudioSession
+│   ├── macosMain/         # macOS SFSpeechRecognizer (no AVAudioSession)
 │   ├── jsMain/            # Web Speech API + @JsExport facade
 │   └── jvmMain/           # JVM stub
 ├── connector-mcp/         # MCP client (JSON-RPC 2.0 over local HTTP)
 ├── connector-remote/      # Webhook client (n8n, Zapier, Make, etc.)
 ├── example-android/       # Android app — all 3 scopes + embedded mock MCP server
+├── example-ios/           # iOS SwiftUI app — all 3 scopes + settings
+├── example-macos/         # macOS SwiftUI app — all 3 scopes + settings + MCP test
 ├── example-web/           # Web app — all 3 scopes (HTML + vanilla JS, no bundler)
 ├── example-jvm/           # JVM CLI app — all 3 scopes (typed input as simulated speech)
-├── example-macos/         # macOS SwiftUI app (copy into Xcode project)
 ├── example-mcp-server/    # Standalone MCP server (Node.js) for real testing
 └── Package.swift          # Swift Package Manager manifest
 ```
@@ -148,26 +151,47 @@ Say **"add buy milk to todo"** — handler fires with `extractedText = "buy milk
 
 **1. Add via Swift Package Manager:**
 
-In Xcode: File → Add Package Dependencies → paste this repo URL.
+In Xcode: File > Add Package Dependencies > paste this repo URL.
 
 Or add to `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/AliHaider-codes/v8v.git", from: "0.1.0")
+.package(url: "https://github.com/alimomin1998/v8v.git", from: "0.1.0")
 ```
 
-**2. Use from Swift:**
+**2. Use VoiceAgentCallbacks from Swift:**
+
+`VoiceAgentCallbacks` is the recommended API for Apple platforms. It bridges Kotlin Flows to simple Swift callbacks:
 
 ```swift
 import V8VCore
 
-let engine = AppleSpeechEngine()
-let config = VoiceAgentConfig(language: "en")
-let agent = VoiceAgent(engine: engine, config: config)
+// Use IosSpeechEngine() on iOS, MacosSpeechEngine() on macOS
+let engine = MacosSpeechEngine()
+let config = VoiceAgentConfig(
+    language: "en-US",
+    continuous: true,
+    partialResults: true,
+    fuzzyThreshold: 0.3,
+    silenceTimeoutMs: 1500
+)
 
+let agent = VoiceAgentCallbacks(
+    engine: engine,
+    config: config,
+    permissionHelper: MacosPermissionHelper()
+)
+
+// Register callbacks to observe events
+agent.onTranscript { text in print("Heard: \(text)") }
+agent.onError { msg in print("Error: \(msg)") }
+agent.onStateChange { state in print("State: \(state)") }
+agent.onUnhandled { text in print("No match: \(text)") }
+
+// Register actions
 agent.registerAction(
     intent: "todo.add",
-    phrases: ["en": ["add * to todo"]],
+    phrases: ["en-US": ["add *", "add * to todo"]],
     handler: { resolved in
         print("Add: \(resolved.extractedText)")
     }
@@ -176,9 +200,12 @@ agent.registerAction(
 agent.start()
 ```
 
+> **Why VoiceAgentCallbacks?** Kotlin Flows cannot be directly observed from Swift. `VoiceAgentCallbacks` internally collects all Flows and invokes simple callbacks. On Android/Kotlin, use `VoiceAgent` directly with Flow collection.
+
 **Requirements:**
 - iOS: `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` in Info.plist
 - macOS: `com.apple.security.device.audio-input` entitlement + `NSSpeechRecognitionUsageDescription` in Info.plist
+- iOS requires a **real device** (simulator does not support speech recognition)
 
 ### Web (JavaScript / TypeScript)
 
@@ -225,7 +252,29 @@ The main entry point. Wires a speech engine, intent resolver, and action router 
 | `transcript` | `SharedFlow<String>` | Every final (or partial) transcript |
 | `errors` | `SharedFlow<VoiceAgentError>` | Structured errors (permission, engine, action) |
 | `actionResults` | `SharedFlow<ActionResult>` | Success/Error from dispatched actions |
-| `audioLevel` | `StateFlow<Float>` | Normalized 0.0–1.0 mic volume |
+| `audioLevel` | `StateFlow<Float>` | Normalized 0.0-1.0 mic volume |
+
+### VoiceAgentCallbacks (Apple / Swift)
+
+Callback-based facade that bridges Kotlin Flows to Swift. Same API as `VoiceAgent` plus callback registration:
+
+| Method | Description |
+|--------|-------------|
+| `onTranscript { text in }` | Called on each transcript |
+| `onError { msg in }` | Called on errors |
+| `onStateChange { state in }` | Called on IDLE/LISTENING/PROCESSING |
+| `onUnhandled { text in }` | Called when no intent matched |
+| `onAudioLevel { level in }` | Called with mic volume (0.0-1.0) |
+
+### VoiceAgentConfig
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `language` | `String` | `"en"` | BCP-47 language tag |
+| `continuous` | `Boolean` | `true` | Auto-restart after each utterance |
+| `partialResults` | `Boolean` | `false` | Forward partial transcripts |
+| `fuzzyThreshold` | `Float` | `0.0` | Dice similarity threshold (0 = exact only) |
+| `silenceTimeoutMs` | `Long` | `1500` | Auto-promote partial to final after this silence (ms). Handles engines that don't reliably send `isFinal`. Set to `0` to disable. |
 
 ### Action Scopes
 
@@ -247,7 +296,7 @@ sealed class VoiceAgentError {
 
 ### Intent Matching
 
-Register `*` wildcard patterns in any language:
+Register `*` wildcard patterns and `{name}` named slots in any language:
 
 ```kotlin
 agent.registerAction(
@@ -260,7 +309,16 @@ agent.registerAction(
 ) { /* ... */ }
 ```
 
-Fuzzy matching uses Dice similarity. Configure the threshold via `VoiceAgentConfig.fuzzyThreshold`.
+**Pass 1 -- Wildcard regex:** Pattern `add * to todo` becomes regex `^add (.+) to todo$`. Exact match gives confidence 1.0.
+
+**Pass 2 -- Fuzzy (Dice similarity):** When `fuzzyThreshold > 0` and exact matching fails:
+
+```
+Dice = (2 * |intersection|) / (|A| + |B|)
+```
+
+Example: Input "add milk to todo" (4 words), pattern literal words {add, to, todo} (3 words).
+`Dice = (2 * 3) / (4 + 3) = 0.86` -- match at threshold 0.5.
 
 ---
 
@@ -318,7 +376,13 @@ Say **"notify meeting at 3pm"** — POSTs a JSON payload to the webhook.
 ./gradlew :example-android:assembleDebug
 
 # Build XCFramework (iOS + macOS)
-./gradlew assembleV8VCoreXCFrameworkRelease
+./gradlew :core:assembleV8VCoreReleaseXCFramework
+
+# Lint check (ktlint)
+./gradlew ktlintCheck
+
+# Auto-format
+./gradlew ktlintFormat
 ```
 
 ### Publishing
@@ -360,10 +424,10 @@ cd core/build/dist/js/productionLibrary && npm publish --access public
 3. In Settings, set MCP URL to `http://localhost:3001/mcp`
 4. Click the mic button
 5. Try:
-   - **"add milk"** — LOCAL scope
-   - **"create task fix the bug"** — MCP scope (requires MCP server)
-   - **"notify server is down"** — REMOTE scope (requires webhook URL)
-   - **"list todos"** — LOCAL scope
+   - **"add milk"** -- LOCAL scope
+   - **"create task fix the bug"** -- MCP scope (requires MCP server)
+   - **"notify server is down"** -- REMOTE scope (requires webhook URL)
+   - **"list todos"** -- LOCAL scope
 
 ### JVM CLI
 
@@ -387,6 +451,11 @@ cd core/build/dist/js/productionLibrary && npm publish --access public
 
 See [example-macos/README.md](example-macos/README.md) for setup instructions.
 
+### iOS (SwiftUI)
+
+See [example-ios/README.md](example-ios/README.md) for setup instructions.
+Requires a **real device** — the iOS Simulator does not support speech recognition.
+
 ### Standalone MCP Server (for testing)
 
 A real MCP server with 4 tools (create, list, delete, search tasks):
@@ -409,6 +478,8 @@ See [PUBLISHING.md](PUBLISHING.md) for full instructions on publishing to:
 - **GitHub Releases + SPM** (iOS / macOS)
 
 Automated release: `./scripts/release.sh 0.2.0`
+
+Tag-based CI publishing: push a `v*` tag to trigger the publish workflow (see `.github/workflows/publish.yml`).
 
 ---
 

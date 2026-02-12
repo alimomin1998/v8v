@@ -1,0 +1,35 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 120
+
+[*.{kt,kts}]
+ktlint_code_style = ktlint_official
+
+# Allow wildcard imports for platform-specific APIs
+ktlint_standard_no-wildcard-imports = disabled
+
+# Allow trailing commas (Kotlin convention)
+ktlint_standard_trailing-comma-on-call-site = disabled
+ktlint_standard_trailing-comma-on-declaration-site = disabled
+
+# Allow blank lines in class body
+ktlint_standard_no-blank-line-in-list = disabled
+
+# Allow consecutive blank lines in files
+ktlint_standard_no-consecutive-blank-lines = disabled
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.yml]
+indent_size = 2
+
+[*.yaml]
+indent_size = 2

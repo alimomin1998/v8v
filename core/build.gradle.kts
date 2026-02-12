@@ -7,6 +7,8 @@ plugins {
 }
 
 kotlin {
+    applyDefaultHierarchyTemplate()
+
     androidTarget {
         compilations.all {
             kotlinOptions {
@@ -18,7 +20,13 @@ kotlin {
     jvm()
 
     js(IR) {
-        browser()
+        browser {
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
+            }
+        }
         binaries.library()
         generateTypeScriptDefinitions()
     }
@@ -68,19 +76,25 @@ kotlin {
             implementation(libs.kotlinx.coroutines.android)
         }
 
-        // Shared Apple source set for iOS + macOS
-        val appleMain by creating {
-            dependsOn(commonMain.get())
-        }
-        val iosMain by creating { dependsOn(appleMain) }
-        val iosArm64Main by getting { dependsOn(iosMain) }
-        val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
-        val iosX64Main by getting { dependsOn(iosMain) }
-
-        val macosMain by creating { dependsOn(appleMain) }
-        val macosArm64Main by getting { dependsOn(macosMain) }
-        val macosX64Main by getting { dependsOn(macosMain) }
+        // With applyDefaultHierarchyTemplate=true, appleMain/iosMain/macosMain
+        // are created automatically by the Kotlin plugin with proper platform
+        // library support. No manual source set wiring needed.
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// The Kotlin metadata compiler for intermediate Apple source sets
+// cannot resolve platform-specific cinterop APIs (AVAudioSession, etc).
+// The actual per-target native compilations work fine. Disable the
+// metadata tasks using taskGraph.whenReady (runs after all tasks exist).
+// ─────────────────────────────────────────────────────────────────────
+gradle.taskGraph.whenReady {
+    allTasks.filter {
+        it.name == "compileAppleMainKotlinMetadata" ||
+        it.name == "compileIosMainKotlinMetadata" ||
+        it.name == "compileMacosMainKotlinMetadata" ||
+        it.name == "compileNativeMainKotlinMetadata"
+    }.forEach { it.enabled = false }
 }
 
 android {
@@ -89,10 +103,18 @@ android {
 
     defaultConfig {
         minSdk = 24
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }

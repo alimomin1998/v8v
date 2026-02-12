@@ -127,6 +127,16 @@ class VoiceAgent(
     private var listeningJob: Job? = null
 
     /**
+     * Job for the silence-timeout promotion timer. When a partial result
+     * arrives and no further speech follows within [VoiceAgentConfig.silenceTimeoutMs],
+     * the partial is automatically promoted to a final result and processed
+     * through intent resolution. This handles engines (like macOS SFSpeechRecognizer)
+     * that don't reliably set `isFinal`.
+     */
+    private var silencePromotionJob: Job? = null
+    private var lastPartialText: String? = null
+
+    /**
      * Register a local voice action using a simple lambda (backward-compatible API).
      *
      * The lambda is wrapped in a [LocalActionHandler] automatically.
@@ -174,9 +184,12 @@ class VoiceAgent(
         if (listeningJob?.isActive == true) return
 
         listeningJob = scope.launch {
-            // Check permission if a helper is available.
+            // Check (and request if needed) permission when a helper is available.
             if (permissionHelper != null) {
-                val status = permissionHelper.checkMicrophonePermission()
+                var status = permissionHelper.checkMicrophonePermission()
+                if (status == PermissionStatus.NOT_DETERMINED) {
+                    status = permissionHelper.requestMicrophonePermission()
+                }
                 if (status != PermissionStatus.GRANTED) {
                     _errors.emit(VoiceAgentError.PermissionDenied(status))
                     _state.value = AgentState.IDLE
@@ -196,6 +209,9 @@ class VoiceAgent(
 
     /** Stop listening. The agent moves to [AgentState.IDLE]. */
     fun stop() {
+        silencePromotionJob?.cancel()
+        silencePromotionJob = null
+        lastPartialText = null
         engine.stopListening()
         listeningJob?.cancel()
         listeningJob = null
@@ -218,36 +234,59 @@ class VoiceAgent(
     private suspend fun handleEvent(event: SpeechEvent) {
         when (event) {
             is SpeechEvent.FinalResult -> {
-                _state.value = AgentState.PROCESSING
-                _transcript.emit(event.text)
+                // Cancel any pending silence promotion — we got a real final.
+                silencePromotionJob?.cancel()
+                silencePromotionJob = null
+                lastPartialText = null
 
-                val resolved = intentResolver.resolve(event.text, _config.language, _config.fuzzyThreshold)
-                if (resolved != null) {
-                    val result = actionRouter.dispatch(resolved)
-                    _actionResults.emit(result)
-                } else {
-                    _unhandledText.emit(event.text)
-                }
-
-                // Continue listening in continuous mode.
-                if (_config.continuous) {
-                    _state.value = AgentState.LISTENING
-                    engine.startListening(_config.language)
-                } else {
-                    _state.value = AgentState.IDLE
-                }
+                processFinalResult(event.text)
             }
 
             is SpeechEvent.PartialResult -> {
                 if (_config.partialResults) {
                     _transcript.emit(event.text)
                 }
+
+                // ── Silence timeout: auto-promote partial → final ──
+                // If the engine doesn't send isFinal (common on macOS),
+                // we promote the last partial after a configurable timeout.
+                val timeoutMs = _config.silenceTimeoutMs
+                if (timeoutMs > 0) {
+                    lastPartialText = event.text
+                    silencePromotionJob?.cancel()
+                    silencePromotionJob = scope.launch {
+                        delay(timeoutMs)
+                        val text = lastPartialText ?: return@launch
+                        lastPartialText = null
+                        // Do NOT call engine.stopListening() here — processFinalResult
+                        // will call engine.startListening() (which stops first) in
+                        // continuous mode, or stop() will be called in non-continuous.
+                        processFinalResult(text)
+                    }
+                }
             }
 
             is SpeechEvent.Error -> {
-                _errors.emit(VoiceAgentError.EngineError(event.code, event.message))
-                // Restart on recoverable errors in continuous mode.
-                if (_config.continuous) {
+                // ── Filter benign errors ──
+                // Apple's SFSpeechRecognizer fires these when:
+                //   1110 = "No speech detected" (timeout, user not speaking)
+                //   216  = "Recognition request was cancelled" (our stopListening)
+                //   301  = "Recognition retry" (transient)
+                //   203  = "Retry" (transient)
+                // These are NOT real errors — they're expected during normal
+                // continuous-mode lifecycle. Don't show them or restart.
+                val isBenign = event.code in BENIGN_ERROR_CODES
+
+                if (!isBenign) {
+                    _errors.emit(VoiceAgentError.EngineError(event.code, event.message))
+                }
+
+                // Only restart on genuine errors in continuous mode.
+                // For benign errors (no speech, cancelled), just keep
+                // the current state — the silence promotion handles restarts.
+                // DO NOT restart here for benign errors to avoid the
+                // start→no speech→error→restart→start→no speech... loop.
+                if (!isBenign && _config.continuous && _state.value != AgentState.IDLE) {
                     delay(RESTART_DELAY_MS)
                     engine.startListening(_config.language)
                 }
@@ -259,7 +298,7 @@ class VoiceAgent(
 
             is SpeechEvent.EndOfSpeech -> {
                 // The engine stopped because of silence. Auto-restart is
-                // handled when FinalResult arrives.
+                // handled when FinalResult arrives or by silence promotion.
             }
 
             is SpeechEvent.ReadyForSpeech -> {
@@ -268,8 +307,50 @@ class VoiceAgent(
         }
     }
 
+    /**
+     * Process a finalized transcript: resolve intent, dispatch action,
+     * and optionally restart in continuous mode.
+     */
+    private suspend fun processFinalResult(text: String) {
+        _state.value = AgentState.PROCESSING
+        _transcript.emit(text)
+
+        val resolved = intentResolver.resolve(text, _config.language, _config.fuzzyThreshold)
+        if (resolved != null) {
+            val result = actionRouter.dispatch(resolved)
+            _actionResults.emit(result)
+        } else {
+            _unhandledText.emit(text)
+        }
+
+        // Continue listening in continuous mode.
+        // engine.startListening() internally calls stopListening() first,
+        // so the old recognition task is properly cleaned up.
+        if (_config.continuous) {
+            _state.value = AgentState.LISTENING
+            engine.startListening(_config.language)
+        } else {
+            _state.value = AgentState.IDLE
+        }
+    }
+
     private companion object {
-        /** Delay before restarting after an error, in milliseconds. */
-        const val RESTART_DELAY_MS = 500L
+        /** Delay before restarting after a real (non-benign) error. */
+        const val RESTART_DELAY_MS = 1000L
+
+        /**
+         * Error codes from Apple's SFSpeechRecognizer that are expected
+         * during normal operation and should not trigger error events or
+         * cause continuous-mode restart loops.
+         */
+        val BENIGN_ERROR_CODES = setOf(
+            1110,  // kAFAssistantErrorDomain: No speech detected
+            216,   // kAFAssistantErrorDomain: Request was cancelled
+            301,   // kAFAssistantErrorDomain: Recognition retry
+            203,   // kAFAssistantErrorDomain: Retry
+            102,   // kAFAssistantErrorDomain: Assets not installed
+            201,   // kAFAssistantErrorDomain: Request was superseded
+            209,   // kAFAssistantErrorDomain: Connection invalidated
+        )
     }
 }

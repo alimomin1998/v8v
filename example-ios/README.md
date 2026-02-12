@@ -1,6 +1,6 @@
-# macOS Example (SwiftUI)
+# iOS Example (SwiftUI)
 
-A native macOS app demonstrating V8V with SwiftUI.
+A native iOS app demonstrating V8V with SwiftUI.
 
 ## Quick Start
 
@@ -11,12 +11,13 @@ A native macOS app demonstrating V8V with SwiftUI.
 
 2. **Open the Xcode project:**
    ```bash
-   open example-macos/V8VMac.xcodeproj
+   open example-ios/V8VPhone.xcodeproj
    ```
 
-3. **Hit Cmd+R** to build and run.
+3. **Select a simulator or device**, then hit **Cmd+R** to build and run.
 
-The app will request microphone and speech recognition permissions on first launch.
+> **Note:** Speech recognition requires a real device. The iOS Simulator
+> does not support microphone input or `SFSpeechRecognizer`.
 
 ## Voice Commands
 
@@ -26,17 +27,11 @@ The app will request microphone and speech recognition permissions on first laun
 | "remove milk" | Removes "milk" from list |
 | "list todos" | Shows all todos in log |
 
-## Entitlements
-
-The project includes `V8VMac.entitlements` with:
-- `com.apple.security.app-sandbox` — required for App Store distribution
-- `com.apple.security.device.audio-input` — microphone access
-
 ## Regenerating the Xcode Project
 
 If you modify `project.yml`, regenerate with:
 ```bash
-cd example-macos
+cd example-ios
 xcodegen generate
 ```
 

@@ -1,0 +1,170 @@
+name: Publish
+
+# Trigger on version tags: v0.1.0, v1.0.0, etc.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write  # Needed for GitHub Release creation
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  JAVA_VERSION: '17'
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  # Run tests before publishing anything
+  # ──────────────────────────────────────────────────────────────────────
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run all JVM tests
+        run: ./gradlew :core:jvmTest :connector-mcp:jvmTest :connector-remote:jvmTest
+
+      - name: Lint check
+        run: ./gradlew ktlintCheck
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Publish to Maven Central (Android, JVM, JS artifacts)
+  # ──────────────────────────────────────────────────────────────────────
+  maven-central:
+    name: Maven Central
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode GPG key
+        run: echo "${{ secrets.GPG_SECRET_KEY_BASE64 }}" | base64 -d > /tmp/secring.gpg
+
+      - name: Publish to Maven Central
+        run: ./gradlew publishAllPublicationsToMavenCentralRepository
+        env:
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          ORG_GRADLE_PROJECT_signing.keyId: ${{ secrets.GPG_KEY_ID }}
+          ORG_GRADLE_PROJECT_signing.password: ${{ secrets.GPG_PASSPHRASE }}
+          ORG_GRADLE_PROJECT_signing.secretKeyRingFile: /tmp/secring.gpg
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Publish to npm (JS/TS package)
+  # ──────────────────────────────────────────────────────────────────────
+  npm:
+    name: npm
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build JS distribution
+        run: ./gradlew :core:jsBrowserProductionLibraryDistribution
+
+      - name: Prepare npm package
+        run: |
+          cp npm/package.json core/build/dist/js/productionLibrary/
+          # Update version from tag
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          cd core/build/dist/js/productionLibrary
+          sed -i "s/\"version\": \".*\"/\"version\": \"${TAG_VERSION}\"/" package.json
+
+      - name: Publish to npm
+        run: npm publish --access public
+        working-directory: core/build/dist/js/productionLibrary
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Build XCFramework and create GitHub Release (iOS/macOS via SPM)
+  # ──────────────────────────────────────────────────────────────────────
+  apple-release:
+    name: GitHub Release (XCFramework)
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build XCFramework
+        run: ./gradlew :core:assembleV8VCoreReleaseXCFramework
+
+      - name: Zip XCFramework
+        run: |
+          cd core/build/XCFrameworks/release
+          zip -r V8VCore.xcframework.zip V8VCore.xcframework
+          echo "CHECKSUM=$(swift package compute-checksum V8VCore.xcframework.zip)" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: core/build/XCFrameworks/release/V8VCore.xcframework.zip
+          body: |
+            ## V8V ${{ github.ref_name }}
+
+            ### Installation
+
+            **Maven Central (Android/Kotlin/JVM):**
+            ```kotlin
+            implementation("io.v8v:core-android:${{ github.ref_name }}")
+            ```
+
+            **npm (Web/JS/TS):**
+            ```bash
+            npm install v8v-core@${{ github.ref_name }}
+            ```
+
+            **Swift Package Manager (iOS/macOS):**
+            ```swift
+            .package(url: "https://github.com/alimomin1998/v8v.git", from: "${{ github.ref_name }}")
+            ```
+
+            **XCFramework checksum:** `${{ env.CHECKSUM }}`
+          generate_release_notes: true

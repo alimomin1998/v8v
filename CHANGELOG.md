@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Distribution
 - Kotlin Multiplatform targets: Android, JVM, JS (browser), iOS (arm64, simulatorArm64, x64), macOS (arm64, x64)
 - `maven-publish` plugin on all library modules (group: `io.v8v`, version: `0.1.0`)
-- XCFramework build for iOS + macOS (`./gradlew assembleV8VCoreXCFramework`)
+- XCFramework build for iOS + macOS (`./gradlew assembleV8VCoreReleaseXCFramework`)
 - Swift Package Manager support via `Package.swift`
 - npm package with TypeScript definitions via `binaries.library()` + `generateTypeScriptDefinitions()`
 - `@JsExport` facade (`VoiceAgentJs`) with callback-based API for JavaScript consumers

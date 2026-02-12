@@ -93,7 +93,7 @@ fi
 # ───────────────────────────────────────────────────
 echo ""
 echo "▸ Step 7: Building XCFramework..."
-./gradlew assembleV8VCoreXCFrameworkRelease
+./gradlew assembleV8VCoreReleaseXCFramework
 echo "  ✓ XCFramework built"
 
 # ───────────────────────────────────────────────────

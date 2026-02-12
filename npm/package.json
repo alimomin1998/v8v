@@ -21,11 +21,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AliHaider-codes/v8v.git"
+    "url": "https://github.com/alimomin1998/v8v.git"
   },
-  "homepage": "https://github.com/AliHaider-codes/v8v#readme",
+  "homepage": "https://github.com/alimomin1998/v8v#readme",
   "bugs": {
-    "url": "https://github.com/AliHaider-codes/v8v/issues"
+    "url": "https://github.com/alimomin1998/v8v/issues"
   },
   "files": [
     "*.js",

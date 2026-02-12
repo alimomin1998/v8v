@@ -1,0 +1,36 @@
+name: V8VPhone
+options:
+  bundleIdPrefix: io.v8v.example
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+
+targets:
+  V8VPhone:
+    type: application
+    platform: iOS
+    sources:
+      - V8VPhone
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.v8v.example.phone
+        INFOPLIST_FILE: V8VPhone/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        FRAMEWORK_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)/../core/build/XCFrameworks/release"
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/Frameworks"
+      debug:
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+    dependencies:
+      - framework: "../core/build/XCFrameworks/release/V8VCore.xcframework"
+        embed: true

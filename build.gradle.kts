@@ -5,11 +5,30 @@ plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.compose.compiler) apply false
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.2"
 }
 
 allprojects {
     group = "io.v8v"
     version = "0.1.0"
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ktlint — consistent code formatting across all modules
+// ═══════════════════════════════════════════════════════════════════════
+subprojects {
+    apply(plugin = "org.jlleitschuh.gradle.ktlint")
+
+    configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
+        version.set("1.5.0")
+        android.set(true)
+        outputToConsole.set(true)
+        ignoreFailures.set(false)
+        filter {
+            exclude("**/generated/**")
+            exclude("**/build/**")
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -35,7 +54,7 @@ subprojects {
                     pom {
                         name.set("V8V - ${project.name}")
                         description.set("Cross-platform voice orchestration framework with native on-device STT")
-                        url.set("https://github.com/AliHaider-codes/v8v")
+                        url.set("https://github.com/alimomin1998/v8v")
                         licenses {
                             license {
                                 name.set("Apache License, Version 2.0")
@@ -44,21 +63,22 @@ subprojects {
                         }
                         developers {
                             developer {
-                                id.set("alihaider")
-                                name.set("Ali Haider")
+                                id.set("alimomin")
+                                name.set("Ali Momin")
                             }
                         }
                         scm {
-                            url.set("https://github.com/AliHaider-codes/v8v")
-                            connection.set("scm:git:git://github.com/AliHaider-codes/v8v.git")
-                            developerConnection.set("scm:git:ssh://git@github.com/AliHaider-codes/v8v.git")
+                            url.set("https://github.com/alimomin1998/v8v")
+                            connection.set("scm:git:git://github.com/alimomin1998/v8v.git")
+                            developerConnection.set("scm:git:ssh://git@github.com/alimomin1998/v8v.git")
                         }
                     }
                 }
             }
 
-            // GPG signing (only when credentials are available)
-            if (findProperty("signing.keyId") != null || System.getenv("GPG_KEY_ID") != null) {
+            // GPG signing — only required for Maven Central, not mavenLocal
+            val secretKeyRingFile = findProperty("signing.secretKeyRingFile") as String?
+            if (secretKeyRingFile != null && file(secretKeyRingFile).exists()) {
                 apply(plugin = "signing")
                 extensions.configure<SigningExtension> {
                     sign(extensions.getByType<PublishingExtension>().publications)
