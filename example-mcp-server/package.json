@@ -1,0 +1,10 @@
+{
+  "name": "v8v-mcp-server",
+  "version": "1.0.0",
+  "description": "Standalone MCP server for testing V8V MCP integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {}
+}

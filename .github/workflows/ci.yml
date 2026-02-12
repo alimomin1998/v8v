@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  # JVM + JS tests (Linux runner — fast and free)
+  # ──────────────────────────────────────────────────────────────────────
+  jvm-js:
+    name: JVM + JS Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Core — compile JVM + JS
+        run: ./gradlew :core:compileKotlinJvm :core:compileKotlinJs
+
+      - name: Core — JVM tests
+        run: ./gradlew :core:jvmTest
+
+      - name: Connector MCP — JVM tests
+        run: ./gradlew :connector-mcp:jvmTest
+
+      - name: Connector Remote — JVM tests
+        run: ./gradlew :connector-remote:jvmTest
+
+      - name: JS browser distribution
+        run: ./gradlew :core:jsBrowserProductionLibraryDistribution
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Android build check
+  # ──────────────────────────────────────────────────────────────────────
+  android:
+    name: Android Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Android example (debug)
+        run: ./gradlew :example-android:assembleDebug
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Apple targets (macOS runner — needed for XCFramework)
+  # ──────────────────────────────────────────────────────────────────────
+  apple:
+    name: Apple (iOS + macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build XCFramework
+        run: ./gradlew assembleV8VCoreXCFrameworkRelease

@@ -1,0 +1,37 @@
+{
+  "name": "v8v-core",
+  "version": "0.1.0",
+  "description": "V8V — Cross-platform voice orchestration framework with native on-device STT, intent matching, and action routing (LOCAL, MCP, Remote webhooks).",
+  "main": "v8v-core.js",
+  "types": "v8v-core.d.ts",
+  "keywords": [
+    "v8v",
+    "voice",
+    "speech-to-text",
+    "stt",
+    "voice-agent",
+    "intent",
+    "mcp",
+    "webhook",
+    "n8n",
+    "kotlin-multiplatform",
+    "web-speech-api"
+  ],
+  "author": "V8V Contributors",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AliHaider-codes/v8v.git"
+  },
+  "homepage": "https://github.com/AliHaider-codes/v8v#readme",
+  "bugs": {
+    "url": "https://github.com/AliHaider-codes/v8v/issues"
+  },
+  "files": [
+    "*.js",
+    "*.js.map",
+    "*.d.ts",
+    "*.mjs",
+    "package.json"
+  ]
+}
