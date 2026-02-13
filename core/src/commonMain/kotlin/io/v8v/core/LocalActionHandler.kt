@@ -12,11 +12,10 @@ import io.v8v.core.model.ResolvedIntent
 class LocalActionHandler(
     private val block: (ResolvedIntent) -> Unit,
 ) : ActionHandler {
-
     override val scope: ActionScope = ActionScope.LOCAL
 
-    override suspend fun execute(intent: ResolvedIntent): ActionResult {
-        return try {
+    override suspend fun execute(intent: ResolvedIntent): ActionResult =
+        try {
             block(intent)
             ActionResult.Success(
                 scope = ActionScope.LOCAL,
@@ -29,5 +28,4 @@ class LocalActionHandler(
                 message = e.message ?: "Local action failed",
             )
         }
-    }
 }

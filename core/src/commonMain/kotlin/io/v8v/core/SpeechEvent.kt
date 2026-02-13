@@ -7,15 +7,21 @@ package io.v8v.core
  * react to partial transcripts, final results, errors, and lifecycle changes.
  */
 sealed class SpeechEvent {
-
     /** Partial (in-progress) transcription while the user is still speaking. */
-    data class PartialResult(val text: String) : SpeechEvent()
+    data class PartialResult(
+        val text: String
+    ) : SpeechEvent()
 
     /** Final transcription after the user finishes an utterance. */
-    data class FinalResult(val text: String) : SpeechEvent()
+    data class FinalResult(
+        val text: String
+    ) : SpeechEvent()
 
     /** An error occurred during recognition. */
-    data class Error(val code: Int, val message: String) : SpeechEvent()
+    data class Error(
+        val code: Int,
+        val message: String
+    ) : SpeechEvent()
 
     /**
      * Audio input level changed. Emitted frequently while listening.
@@ -26,7 +32,9 @@ sealed class SpeechEvent {
      *
      * @property level Normalized audio level in the range 0.0 (silence) to 1.0 (loud).
      */
-    data class RmsChanged(val level: Float) : SpeechEvent()
+    data class RmsChanged(
+        val level: Float
+    ) : SpeechEvent()
 
     /** The engine is ready and actively listening for speech. */
     data object ReadyForSpeech : SpeechEvent()

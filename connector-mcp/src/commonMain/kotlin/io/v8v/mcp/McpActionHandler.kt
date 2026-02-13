@@ -22,16 +22,16 @@ class McpActionHandler(
     private val toolName: String,
     private val argumentKey: String = "text",
 ) : ActionHandler {
-
     override val scope: ActionScope = ActionScope.MCP
 
-    override suspend fun execute(intent: ResolvedIntent): ActionResult {
-        return try {
-            val arguments = buildJsonObject {
-                put(argumentKey, JsonPrimitive(intent.extractedText))
-                put("rawText", JsonPrimitive(intent.rawText))
-                put("language", JsonPrimitive(intent.language))
-            }
+    override suspend fun execute(intent: ResolvedIntent): ActionResult =
+        try {
+            val arguments =
+                buildJsonObject {
+                    put(argumentKey, JsonPrimitive(intent.extractedText))
+                    put("rawText", JsonPrimitive(intent.rawText))
+                    put("language", JsonPrimitive(intent.language))
+                }
 
             val result = client.callTool(toolName, arguments)
 
@@ -56,5 +56,4 @@ class McpActionHandler(
                 message = "MCP call failed: ${e.message}",
             )
         }
-    }
 }

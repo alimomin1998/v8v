@@ -14,7 +14,6 @@ import io.v8v.core.model.ResolvedIntent
  * developer's registration code is transport-agnostic.
  */
 interface ActionHandler {
-
     /** Where this handler executes. */
     val scope: ActionScope
 

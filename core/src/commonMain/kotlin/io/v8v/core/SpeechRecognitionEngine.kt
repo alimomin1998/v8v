@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
  * keep [isListening] up-to-date.
  */
 interface SpeechRecognitionEngine {
-
     /** Stream of speech recognition events. Backed by a SharedFlow for multi-collector support. */
     val events: SharedFlow<SpeechEvent>
 

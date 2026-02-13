@@ -1,7 +1,6 @@
 package io.v8v.example.jvm
 
 import io.v8v.core.*
-import io.v8v.core.model.ResolvedIntent
 import io.v8v.core.model.VoiceAgentConfig
 import io.v8v.mcp.McpActionHandler
 import io.v8v.mcp.McpClient
@@ -35,144 +34,147 @@ import kotlinx.coroutines.flow.*
  * For MCP to work, start the standalone MCP server first:
  *   node example-mcp-server/server.js
  */
-fun main() = runBlocking {
-    println("═══════════════════════════════════════════════════════")
-    println("  Voice Agent — JVM CLI Demo")
-    println("  Type commands as if speaking. Type 'quit' to exit.")
-    println("═══════════════════════════════════════════════════════")
-    println()
+fun main() =
+    runBlocking {
+        println("═══════════════════════════════════════════════════════")
+        println("  Voice Agent — JVM CLI Demo")
+        println("  Type commands as if speaking. Type 'quit' to exit.")
+        println("═══════════════════════════════════════════════════════")
+        println()
 
-    // ── Setup ───────────────────────────────────────────────────
+        // ── Setup ───────────────────────────────────────────────────
 
-    val engine = ConsoleSimulatedEngine()
-    val agent = VoiceAgent(
-        engine = engine,
-        config = VoiceAgentConfig(language = "en"),
-    )
+        val engine = ConsoleSimulatedEngine()
+        val agent =
+            VoiceAgent(
+                engine = engine,
+                config = VoiceAgentConfig(language = "en"),
+            )
 
-    val todos = mutableListOf<String>()
+        val todos = mutableListOf<String>()
 
-    // ── LOCAL: "add <item>" ─────────────────────────────────────
+        // ── LOCAL: "add <item>" ─────────────────────────────────────
 
-    agent.registerAction(
-        intent = "todo.add",
-        phrases = mapOf("en" to listOf("add *", "add * to todo", "add * to my list")),
-    ) { resolved ->
-        todos.add(resolved.extractedText)
-        println("  [LOCAL] Added: \"${resolved.extractedText}\" (total: ${todos.size})")
-    }
-
-    agent.registerAction(
-        intent = "todo.remove",
-        phrases = mapOf("en" to listOf("remove *", "delete *")),
-    ) { resolved ->
-        val idx = todos.indexOfFirst { it.contains(resolved.extractedText, ignoreCase = true) }
-        if (idx >= 0) {
-            val removed = todos.removeAt(idx)
-            println("  [LOCAL] Removed: \"$removed\" (remaining: ${todos.size})")
-        } else {
-            println("  [LOCAL] \"${resolved.extractedText}\" not found")
+        agent.registerAction(
+            intent = "todo.add",
+            phrases = mapOf("en" to listOf("add *", "add * to todo", "add * to my list")),
+        ) { resolved ->
+            todos.add(resolved.extractedText)
+            println("  [LOCAL] Added: \"${resolved.extractedText}\" (total: ${todos.size})")
         }
-    }
 
-    agent.registerAction(
-        intent = "todo.list",
-        phrases = mapOf("en" to listOf("list todos", "show todos", "show my list")),
-    ) { _ ->
-        if (todos.isEmpty()) {
-            println("  [LOCAL] Todo list is empty")
-        } else {
-            println("  [LOCAL] Todos:")
-            todos.forEachIndexed { i, t -> println("    $i: $t") }
+        agent.registerAction(
+            intent = "todo.remove",
+            phrases = mapOf("en" to listOf("remove *", "delete *")),
+        ) { resolved ->
+            val idx = todos.indexOfFirst { it.contains(resolved.extractedText, ignoreCase = true) }
+            if (idx >= 0) {
+                val removed = todos.removeAt(idx)
+                println("  [LOCAL] Removed: \"$removed\" (remaining: ${todos.size})")
+            } else {
+                println("  [LOCAL] \"${resolved.extractedText}\" not found")
+            }
         }
-    }
 
-    // ── MCP: "create task <item>" ───────────────────────────────
-
-    val mcpClient = McpClient(McpServerConfig(name = "task-server", port = 3001))
-    var mcpConnected = false
-
-    try {
-        val info = mcpClient.initialize()
-        mcpConnected = true
-        println("[MCP] Connected to ${info.serverInfo?.name ?: "server"}")
-    } catch (e: Exception) {
-        println("[MCP] Not connected (${e.message}). Start: node example-mcp-server/server.js")
-    }
-
-    agent.registerAction(
-        intent = "task.create",
-        phrases = mapOf("en" to listOf("create task *", "new task *")),
-        handler = McpActionHandler(mcpClient, "create_task"),
-    )
-
-    // ── REMOTE: "notify <message>" ──────────────────────────────
-
-    agent.registerAction(
-        intent = "notify.team",
-        phrases = mapOf("en" to listOf("notify *", "send notification *", "alert *")),
-        handler = WebhookActionHandler(
-            WebhookConfig(url = "https://httpbin.org/post"),
-        ),
-    )
-
-    // ── Collect flows ───────────────────────────────────────────
-
-    launch {
-        agent.errors.collect { error ->
-            println("  [ERROR] ${error.message}")
+        agent.registerAction(
+            intent = "todo.list",
+            phrases = mapOf("en" to listOf("list todos", "show todos", "show my list")),
+        ) { _ ->
+            if (todos.isEmpty()) {
+                println("  [LOCAL] Todo list is empty")
+            } else {
+                println("  [LOCAL] Todos:")
+                todos.forEachIndexed { i, t -> println("    $i: $t") }
+            }
         }
-    }
 
-    launch {
-        agent.actionResults.collect { result ->
-            when (result) {
-                is ActionResult.Success -> {
-                    println("  [${result.scope}] ${result.intent}: ${result.message}")
+        // ── MCP: "create task <item>" ───────────────────────────────
+
+        val mcpClient = McpClient(McpServerConfig(name = "task-server", port = 3001))
+        var mcpConnected = false
+
+        try {
+            val info = mcpClient.initialize()
+            mcpConnected = true
+            println("[MCP] Connected to ${info.serverInfo?.name ?: "server"}")
+        } catch (e: Exception) {
+            println("[MCP] Not connected (${e.message}). Start: node example-mcp-server/server.js")
+        }
+
+        agent.registerAction(
+            intent = "task.create",
+            phrases = mapOf("en" to listOf("create task *", "new task *")),
+            handler = McpActionHandler(mcpClient, "create_task"),
+        )
+
+        // ── REMOTE: "notify <message>" ──────────────────────────────
+
+        agent.registerAction(
+            intent = "notify.team",
+            phrases = mapOf("en" to listOf("notify *", "send notification *", "alert *")),
+            handler =
+                WebhookActionHandler(
+                    WebhookConfig(url = "https://httpbin.org/post"),
+                ),
+        )
+
+        // ── Collect flows ───────────────────────────────────────────
+
+        launch {
+            agent.errors.collect { error ->
+                println("  [ERROR] ${error.message}")
+            }
+        }
+
+        launch {
+            agent.actionResults.collect { result ->
+                when (result) {
+                    is ActionResult.Success -> {
+                        println("  [${result.scope}] ${result.intent}: ${result.message}")
+                    }
+                    is ActionResult.Error -> {
+                        println("  [${result.scope}] ${result.intent} FAILED: ${result.message}")
+                    }
                 }
-                is ActionResult.Error -> {
-                    println("  [${result.scope}] ${result.intent} FAILED: ${result.message}")
+            }
+        }
+
+        launch {
+            agent.unhandledText.collect { text ->
+                println("  [UNMATCHED] \"$text\" — try: add/remove/list/create task/notify")
+            }
+        }
+
+        // ── Start agent + read input ────────────────────────────────
+
+        agent.start()
+
+        println()
+        println("Ready! Type a voice command:")
+        println("  Examples: 'add buy milk', 'create task fix bug', 'notify server down', 'list todos'")
+        println()
+
+        // Read lines from console and feed them to the simulated engine
+        withContext(Dispatchers.IO) {
+            while (isActive) {
+                print("> ")
+                val line = readlnOrNull()?.trim() ?: break
+                if (line.equals("quit", ignoreCase = true) || line.equals("exit", ignoreCase = true)) {
+                    break
+                }
+                if (line.isNotEmpty()) {
+                    engine.simulateInput(line)
+                    delay(100) // Give time for flow processing
                 }
             }
         }
+
+        // ── Cleanup ─────────────────────────────────────────────────
+
+        agent.destroy()
+        mcpClient.close()
+        println("\nGoodbye!")
     }
-
-    launch {
-        agent.unhandledText.collect { text ->
-            println("  [UNMATCHED] \"$text\" — try: add/remove/list/create task/notify")
-        }
-    }
-
-    // ── Start agent + read input ────────────────────────────────
-
-    agent.start()
-
-    println()
-    println("Ready! Type a voice command:")
-    println("  Examples: 'add buy milk', 'create task fix bug', 'notify server down', 'list todos'")
-    println()
-
-    // Read lines from console and feed them to the simulated engine
-    withContext(Dispatchers.IO) {
-        while (isActive) {
-            print("> ")
-            val line = readlnOrNull()?.trim() ?: break
-            if (line.equals("quit", ignoreCase = true) || line.equals("exit", ignoreCase = true)) {
-                break
-            }
-            if (line.isNotEmpty()) {
-                engine.simulateInput(line)
-                delay(100) // Give time for flow processing
-            }
-        }
-    }
-
-    // ── Cleanup ─────────────────────────────────────────────────
-
-    agent.destroy()
-    mcpClient.close()
-    println("\nGoodbye!")
-}
 
 /**
  * A simulated SpeechRecognitionEngine for JVM that accepts typed text
@@ -183,7 +185,6 @@ fun main() = runBlocking {
  * Whisper.cpp, Google Cloud STT, or similar.
  */
 class ConsoleSimulatedEngine : SpeechRecognitionEngine {
-
     private val _events = MutableSharedFlow<SpeechEvent>(extraBufferCapacity = 64)
     override val events: SharedFlow<SpeechEvent> = _events.asSharedFlow()
 

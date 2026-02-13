@@ -10,9 +10,8 @@ import kotlin.js.Promise
  * access via `navigator.mediaDevices.getUserMedia`.
  */
 class WebPermissionHelper : PermissionHelper {
-
-    override suspend fun checkMicrophonePermission(): PermissionStatus {
-        return try {
+    override suspend fun checkMicrophonePermission(): PermissionStatus =
+        try {
             val navigator = js("navigator")
             val permissions = navigator.permissions
             if (permissions != null) {
@@ -28,16 +27,18 @@ class WebPermissionHelper : PermissionHelper {
         } catch (_: dynamic) {
             PermissionStatus.NOT_DETERMINED
         }
-    }
 
-    override suspend fun requestMicrophonePermission(): PermissionStatus {
-        return try {
+    override suspend fun requestMicrophonePermission(): PermissionStatus =
+        try {
             val navigator = js("navigator")
             val mediaDevices = navigator.mediaDevices
             if (mediaDevices != null) {
-                val stream = (mediaDevices.getUserMedia(
-                    js("{audio: true}"),
-                ) as Promise<dynamic>).await()
+                val stream =
+                    (
+                        mediaDevices.getUserMedia(
+                            js("{audio: true}"),
+                        ) as Promise<dynamic>
+                    ).await()
                 // Got permission — stop the stream immediately (we just needed the permission)
                 val tracks = stream.getTracks() as Array<dynamic>
                 tracks.forEach { track -> track.stop() }
@@ -48,5 +49,4 @@ class WebPermissionHelper : PermissionHelper {
         } catch (_: dynamic) {
             PermissionStatus.DENIED
         }
-    }
 }

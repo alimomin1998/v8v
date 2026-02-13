@@ -354,7 +354,7 @@ async function handleRemoteAction(result) {
 function renderTodos() {
     if (!todoListEl) return;
     if (todos.length === 0) {
-        todoListEl.innerHTML = '<div class="empty-state">Say "add milk" to get started</div>';
+        todoListEl.innerHTML = '<div class="empty-state">Say "add project status update" to get started</div>';
         return;
     }
     todoListEl.innerHTML = todos.map((t, i) =>

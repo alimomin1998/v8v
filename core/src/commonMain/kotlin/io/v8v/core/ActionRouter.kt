@@ -13,7 +13,6 @@ import io.v8v.core.model.ResolvedIntent
  * remote webhook.
  */
 class ActionRouter {
-
     private val handlers = mutableMapOf<String, ActionHandler>()
 
     /**
@@ -22,7 +21,10 @@ class ActionRouter {
      * @param intent Intent identifier (e.g. "todo.add").
      * @param handler The handler that will execute when this intent is dispatched.
      */
-    fun register(intent: String, handler: ActionHandler) {
+    fun register(
+        intent: String,
+        handler: ActionHandler
+    ) {
         handlers[intent] = handler
     }
 
@@ -33,12 +35,13 @@ class ActionRouter {
      *   no handler is registered for the intent.
      */
     suspend fun dispatch(resolved: ResolvedIntent): ActionResult {
-        val handler = handlers[resolved.intent]
-            ?: return ActionResult.Error(
-                scope = ActionScope.LOCAL,
-                intent = resolved.intent,
-                message = "No handler registered for intent '${resolved.intent}'",
-            )
+        val handler =
+            handlers[resolved.intent]
+                ?: return ActionResult.Error(
+                    scope = ActionScope.LOCAL,
+                    intent = resolved.intent,
+                    message = "No handler registered for intent '${resolved.intent}'",
+                )
         return try {
             handler.execute(resolved)
         } catch (e: Exception) {

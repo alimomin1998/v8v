@@ -24,12 +24,13 @@ import io.v8v.core.model.ResolvedIntent
  * as a fallback.
  */
 class IntentResolver {
-
     /**
      * Descriptor for a single capture group in a pattern.
      * [name] is `null` for anonymous `*` wildcards.
      */
-    private data class SlotDescriptor(val name: String?)
+    private data class SlotDescriptor(
+        val name: String?
+    )
 
     private data class RegisteredPattern(
         val intent: String,
@@ -49,7 +50,10 @@ class IntentResolver {
      * @param phrases Map of language code to list of patterns. Each pattern
      *   may contain `*` wildcards and/or `{name}` named slots.
      */
-    fun register(intent: String, phrases: Map<String, List<String>>) {
+    fun register(
+        intent: String,
+        phrases: Map<String, List<String>>
+    ) {
         for ((language, phraseList) in phrases) {
             for (phrase in phraseList) {
                 val normalized = phrase.trim().lowercase()
@@ -194,11 +198,15 @@ class IntentResolver {
      * This makes the `fuzzyThreshold` setting meaningful: at 0.5 you accept
      * loose matches with filler, at 0.8 you require close phrasing.
      */
-    private fun tokenOverlapScore(phrase: String, inputWords: Set<String>): Float {
+    private fun tokenOverlapScore(
+        phrase: String,
+        inputWords: Set<String>
+    ): Float {
         // Remove wildcards and slot placeholders, then tokenize.
-        val cleaned = phrase
-            .replace("*", " ")
-            .replace(Regex("""\{\w+\}"""), " ")
+        val cleaned =
+            phrase
+                .replace("*", " ")
+                .replace(Regex("""\{\w+\}"""), " ")
         val patternTokens = cleaned.split("\\s+".toRegex()).filter { it.isNotEmpty() }.toSet()
         if (patternTokens.isEmpty()) return 0f
 

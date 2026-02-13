@@ -517,12 +517,12 @@ struct ContentView: View {
                 }
 
                 // ══════════════════════════════
-                // Todo List (LOCAL scope)
+                // Task List (LOCAL scope)
                 // ══════════════════════════════
                 GroupBox {
                     VStack(alignment: .leading, spacing: 4) {
                         if vm.todos.isEmpty {
-                            Text("Say \"add milk\" to get started")
+                            Text("Say \"add project status update\" to get started")
                                 .foregroundColor(.secondary)
                                 .italic()
                         } else {
@@ -543,7 +543,7 @@ struct ContentView: View {
                     }
                 } label: {
                     HStack {
-                        Text("Todo List")
+                        Text("Task List")
                         Spacer()
                         Badge(text: "LOCAL", color: .purple)
                     }

@@ -38,7 +38,6 @@ private fun createSpeechRecognition(): dynamic {
  * [SpeechEvent.RmsChanged] is never emitted on this platform.
  */
 class WebSpeechEngine : SpeechRecognitionEngine {
-
     private val _events = MutableSharedFlow<SpeechEvent>(extraBufferCapacity = 64)
     override val events: SharedFlow<SpeechEvent> = _events.asSharedFlow()
 

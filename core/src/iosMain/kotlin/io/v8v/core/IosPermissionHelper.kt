@@ -20,9 +20,8 @@ import kotlin.coroutines.resume
  */
 @OptIn(ExperimentalForeignApi::class)
 class IosPermissionHelper : PermissionHelper {
-
-    override suspend fun checkMicrophonePermission(): PermissionStatus {
-        return when (SFSpeechRecognizer.authorizationStatus()) {
+    override suspend fun checkMicrophonePermission(): PermissionStatus =
+        when (SFSpeechRecognizer.authorizationStatus()) {
             SFSpeechRecognizerAuthorizationStatus.SFSpeechRecognizerAuthorizationStatusAuthorized ->
                 PermissionStatus.GRANTED
             SFSpeechRecognizerAuthorizationStatus.SFSpeechRecognizerAuthorizationStatusDenied,
@@ -30,30 +29,32 @@ class IosPermissionHelper : PermissionHelper {
                 PermissionStatus.DENIED
             else -> PermissionStatus.NOT_DETERMINED
         }
-    }
 
     override suspend fun requestMicrophonePermission(): PermissionStatus {
         // Request microphone permission first
-        val micGranted = suspendCancellableCoroutine { continuation ->
-            AVAudioSession.sharedInstance().requestRecordPermission { granted ->
-                if (continuation.isActive) {
-                    continuation.resume(granted)
+        val micGranted =
+            suspendCancellableCoroutine { continuation ->
+                AVAudioSession.sharedInstance().requestRecordPermission { granted ->
+                    if (continuation.isActive) {
+                        continuation.resume(granted)
+                    }
                 }
             }
-        }
 
         if (!micGranted) return PermissionStatus.DENIED
 
         // Then request speech recognition permission
-        val speechGranted = suspendCancellableCoroutine { continuation ->
-            SFSpeechRecognizer.requestAuthorization { status ->
-                if (continuation.isActive) {
-                    continuation.resume(
-                        status == SFSpeechRecognizerAuthorizationStatus.SFSpeechRecognizerAuthorizationStatusAuthorized,
-                    )
+        val speechGranted =
+            suspendCancellableCoroutine { continuation ->
+                SFSpeechRecognizer.requestAuthorization { status ->
+                    if (continuation.isActive) {
+                        continuation.resume(
+                            status ==
+                                SFSpeechRecognizerAuthorizationStatus.SFSpeechRecognizerAuthorizationStatusAuthorized,
+                        )
+                    }
                 }
             }
-        }
 
         return if (speechGranted) PermissionStatus.GRANTED else PermissionStatus.DENIED
     }

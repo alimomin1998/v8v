@@ -26,16 +26,18 @@ import kotlinx.coroutines.launch
  * ```
  */
 @JsExport
-class VoiceAgentJs(language: String = "en") {
-
+class VoiceAgentJs(
+    language: String = "en"
+) {
     private val scope = MainScope()
     private val engine = WebSpeechEngine()
     private val permissionHelper = WebPermissionHelper()
-    private val agent = VoiceAgent(
-        engine = engine,
-        config = VoiceAgentConfig(language = language),
-        permissionHelper = permissionHelper,
-    )
+    private val agent =
+        VoiceAgent(
+            engine = engine,
+            config = VoiceAgentConfig(language = language),
+            permissionHelper = permissionHelper,
+        )
 
     /**
      * Register a voice command phrase pattern for an intent.
@@ -44,7 +46,11 @@ class VoiceAgentJs(language: String = "en") {
      * @param language BCP-47 language tag (e.g. "en", "es").
      * @param phrase Pattern with `*` wildcards (e.g. "add * to list").
      */
-    fun registerPhrase(intent: String, language: String, phrase: String) {
+    fun registerPhrase(
+        intent: String,
+        language: String,
+        phrase: String
+    ) {
         agent.registerAction(intent, mapOf(language to listOf(phrase))) { /* no-op local handler */ }
     }
 

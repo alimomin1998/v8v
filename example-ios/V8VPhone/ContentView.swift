@@ -384,17 +384,17 @@ struct ContentView: View {
                         .cornerRadius(10)
                     }
 
-                    // ── Todo List ──
+                    // ── Task List ──
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Label("Todo List", systemImage: "checklist")
+                            Label("Task List", systemImage: "checklist")
                                 .font(.headline)
                             Spacer()
                             BadgeView(text: "LOCAL", color: .purple)
                         }
 
                         if vm.todos.isEmpty {
-                            Text("Say \"add milk\" to get started")
+                            Text("Say \"add project status update\" to get started")
                                 .foregroundColor(.secondary)
                                 .italic()
                                 .padding()

@@ -3,13 +3,13 @@ package io.v8v.core
 import android.speech.SpeechRecognizer
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import java.util.concurrent.atomic.AtomicReference
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assume
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Android instrumented tests for [AndroidSpeechEngine].
@@ -26,7 +26,6 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidSpeechEngineTest {
-
     private var engine: AndroidSpeechEngine? = null
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 

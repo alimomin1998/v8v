@@ -12,7 +12,6 @@ import kotlin.test.assertNull
  * regex-based intent resolution works correctly in the JS/IR target.
  */
 class IntentResolverJsTest {
-
     @Test
     fun wildcard_pattern_works_in_js() {
         val resolver = IntentResolver()

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package io.v8v.example
 
 import android.Manifest
@@ -39,11 +41,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -100,34 +102,39 @@ fun VoiceTodoScreen(viewModel: MainViewModel = viewModel()) {
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
-                context, Manifest.permission.RECORD_AUDIO,
+                context,
+                Manifest.permission.RECORD_AUDIO,
             ) == PackageManager.PERMISSION_GRANTED,
         )
     }
 
     LaunchedEffect(Unit) {
         hasPermission = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.RECORD_AUDIO,
+            context,
+            Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        hasPermission = granted
-        if (granted) viewModel.startListening()
-    }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            hasPermission = granted
+            if (granted) viewModel.startListening()
+        }
 
-    val isListening = agentState == AgentState.LISTENING ||
-        agentState == AgentState.PROCESSING
+    val isListening =
+        agentState == AgentState.LISTENING ||
+            agentState == AgentState.PROCESSING
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Voice Agent Demo") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ),
             )
         },
         floatingActionButton = {
@@ -145,11 +152,12 @@ fun VoiceTodoScreen(viewModel: MainViewModel = viewModel()) {
         },
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -179,14 +187,14 @@ fun VoiceTodoScreen(viewModel: MainViewModel = viewModel()) {
 
             // -- Todo list (LOCAL scope) --
             Text(
-                text = "Todos (LOCAL)",
+                text = "Task List (LOCAL)",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(modifier = Modifier.height(4.dp))
             if (todos.isEmpty()) {
                 Text(
-                    text = "No todos yet. Say \"Add milk\"",
+                    text = "No todos yet. Say \"Add project status update\"",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -231,8 +239,12 @@ private fun MicFab(
     onClick: () -> Unit,
 ) {
     val fabColor by animateColorAsState(
-        targetValue = if (isListening) MaterialTheme.colorScheme.error
-        else MaterialTheme.colorScheme.primary,
+        targetValue =
+            if (isListening) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
         label = "fab_color",
     )
 
@@ -251,14 +263,15 @@ private fun MicFab(
         // Pulsing ring behind the FAB
         if (isListening) {
             Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .scale(ringScale)
-                    .graphicsLayer { alpha = ringAlpha }
-                    .background(
-                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
-                        shape = CircleShape,
-                    ),
+                modifier =
+                    Modifier
+                        .size(56.dp)
+                        .scale(ringScale)
+                        .graphicsLayer { alpha = ringAlpha }
+                        .background(
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
+                            shape = CircleShape,
+                        ),
             )
         }
 
@@ -267,9 +280,10 @@ private fun MicFab(
             containerColor = fabColor,
         ) {
             Icon(
-                painter = painterResource(
-                    if (isListening) R.drawable.ic_mic_off else R.drawable.ic_mic,
-                ),
+                painter =
+                    painterResource(
+                        if (isListening) R.drawable.ic_mic_off else R.drawable.ic_mic,
+                    ),
                 contentDescription = if (isListening) "Stop" else "Start",
             )
         }
@@ -289,9 +303,10 @@ private fun SettingsCard(viewModel: MainViewModel) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            ),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
@@ -313,9 +328,10 @@ private fun SettingsCard(viewModel: MainViewModel) {
                     readOnly = true,
                     label = { Text("Language") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(type = MenuAnchorType.PrimaryNotEditable),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(type = MenuAnchorType.PrimaryNotEditable),
                     textStyle = MaterialTheme.typography.bodySmall,
                 )
                 ExposedDropdownMenu(
@@ -379,9 +395,10 @@ private fun SettingsCard(viewModel: MainViewModel) {
 private fun CommandsCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            ),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
@@ -390,19 +407,23 @@ private fun CommandsCard() {
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(modifier = Modifier.height(4.dp))
-            CommandRow(scope = "LOCAL", example = "\"Add milk\"")
-            CommandRow(scope = "MCP", example = "\"Create task buy groceries\"")
-            CommandRow(scope = "REMOTE", example = "\"Notify meeting at 3pm\"")
+            CommandRow(scope = "LOCAL", example = "\"Add project status update\"")
+            CommandRow(scope = "MCP", example = "\"Create task schedule design review\"")
+            CommandRow(scope = "REMOTE", example = "\"Notify team project kickoff is at 3 PM\"")
         }
     }
 }
 
 @Composable
-private fun CommandRow(scope: String, example: String) {
+private fun CommandRow(
+    scope: String,
+    example: String
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ScopeBadge(scope)
@@ -417,12 +438,13 @@ private fun CommandRow(scope: String, example: String) {
 
 @Composable
 private fun ScopeBadge(scope: String) {
-    val color = when (scope) {
-        "LOCAL" -> MaterialTheme.colorScheme.primary
-        "MCP" -> MaterialTheme.colorScheme.tertiary
-        "REMOTE" -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.outline
-    }
+    val color =
+        when (scope) {
+            "LOCAL" -> MaterialTheme.colorScheme.primary
+            "MCP" -> MaterialTheme.colorScheme.tertiary
+            "REMOTE" -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.outline
+        }
     Surface(
         shape = MaterialTheme.shapes.extraSmall,
         color = color.copy(alpha = 0.15f),
@@ -461,24 +483,30 @@ private fun WebhookUrlField(viewModel: MainViewModel) {
 // ---- Status Card ----
 
 @Composable
-private fun StatusCard(agentState: AgentState, lastTranscript: String) {
+private fun StatusCard(
+    agentState: AgentState,
+    lastTranscript: String
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = when (agentState) {
-                AgentState.LISTENING -> MaterialTheme.colorScheme.primaryContainer
-                AgentState.PROCESSING -> MaterialTheme.colorScheme.tertiaryContainer
-                AgentState.IDLE -> MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    when (agentState) {
+                        AgentState.LISTENING -> MaterialTheme.colorScheme.primaryContainer
+                        AgentState.PROCESSING -> MaterialTheme.colorScheme.tertiaryContainer
+                        AgentState.IDLE -> MaterialTheme.colorScheme.surfaceVariant
+                    },
+            ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = when (agentState) {
-                    AgentState.LISTENING -> "Listening..."
-                    AgentState.PROCESSING -> "Processing..."
-                    AgentState.IDLE -> "Tap the mic to start"
-                },
+                text =
+                    when (agentState) {
+                        AgentState.LISTENING -> "Listening..."
+                        AgentState.PROCESSING -> "Processing..."
+                        AgentState.IDLE -> "Tap the mic to start"
+                    },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -497,12 +525,17 @@ private fun StatusCard(agentState: AgentState, lastTranscript: String) {
 // ---- Todo Item with scope badge ----
 
 @Composable
-private fun TodoItem(text: String, scope: String, onDelete: () -> Unit) {
+private fun TodoItem(
+    text: String,
+    scope: String,
+    onDelete: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -534,9 +567,10 @@ private fun CollapsibleDebugPanel(lines: List<String>) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { isExpanded = !isExpanded },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { isExpanded = !isExpanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {

@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import platform.AVFAudio.AVAudioEngine
+import platform.Foundation.NSLocale
 import platform.Speech.SFSpeechAudioBufferRecognitionRequest
 import platform.Speech.SFSpeechRecognitionTask
 import platform.Speech.SFSpeechRecognizer
-import platform.Foundation.NSLocale
 import kotlin.math.log10
 import kotlin.math.sqrt
 
@@ -32,7 +32,6 @@ import kotlin.math.sqrt
  */
 @OptIn(ExperimentalForeignApi::class)
 class MacosSpeechEngine : SpeechRecognitionEngine {
-
     private val _events = MutableSharedFlow<SpeechEvent>(extraBufferCapacity = 64)
     override val events: SharedFlow<SpeechEvent> = _events.asSharedFlow()
 
@@ -113,31 +112,32 @@ class MacosSpeechEngine : SpeechRecognitionEngine {
         }
 
         // ── Step 3: Start recognition task AFTER audio is already flowing ──
-        recognitionTask = speechRecognizer!!.recognitionTaskWithRequest(request) { result, error ->
-            if (error != null) {
-                // Only emit the error — do NOT call stopListening() here.
-                // The VoiceAgent decides whether to restart or stop based on
-                // error type and continuous mode setting. Calling stopListening()
-                // from within the callback causes re-entrant issues and
-                // a cancel→error→restart→cancel loop.
-                _events.tryEmit(
-                    SpeechEvent.Error(
-                        code = error.code.toInt(),
-                        message = error.localizedDescription ?: "Recognition error",
-                    ),
-                )
-                return@recognitionTaskWithRequest
-            }
+        recognitionTask =
+            speechRecognizer!!.recognitionTaskWithRequest(request) { result, error ->
+                if (error != null) {
+                    // Only emit the error — do NOT call stopListening() here.
+                    // The VoiceAgent decides whether to restart or stop based on
+                    // error type and continuous mode setting. Calling stopListening()
+                    // from within the callback causes re-entrant issues and
+                    // a cancel→error→restart→cancel loop.
+                    _events.tryEmit(
+                        SpeechEvent.Error(
+                            code = error.code.toInt(),
+                            message = error.localizedDescription ?: "Recognition error",
+                        ),
+                    )
+                    return@recognitionTaskWithRequest
+                }
 
-            if (result != null) {
-                val transcript = result.bestTranscription.formattedString
-                if (result.isFinal()) {
-                    _events.tryEmit(SpeechEvent.FinalResult(transcript))
-                } else {
-                    _events.tryEmit(SpeechEvent.PartialResult(transcript))
+                if (result != null) {
+                    val transcript = result.bestTranscription.formattedString
+                    if (result.isFinal()) {
+                        _events.tryEmit(SpeechEvent.FinalResult(transcript))
+                    } else {
+                        _events.tryEmit(SpeechEvent.PartialResult(transcript))
+                    }
                 }
             }
-        }
 
         _isListening.value = true
         _events.tryEmit(SpeechEvent.ReadyForSpeech)

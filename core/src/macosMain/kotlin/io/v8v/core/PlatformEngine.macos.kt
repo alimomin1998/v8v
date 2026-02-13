@@ -5,5 +5,4 @@ package io.v8v.core
  *
  * Returns a [MacosSpeechEngine] backed by SFSpeechRecognizer + AVAudioEngine.
  */
-actual fun createPlatformEngine(context: Any?): SpeechRecognitionEngine =
-    MacosSpeechEngine()
+actual fun createPlatformEngine(context: Any?): SpeechRecognitionEngine = MacosSpeechEngine()

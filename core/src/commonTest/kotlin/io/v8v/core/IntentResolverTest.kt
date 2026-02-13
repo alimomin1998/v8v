@@ -7,7 +7,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IntentResolverTest {
-
     @Test
     fun resolves_simple_wildcard_pattern() {
         val resolver = IntentResolver()

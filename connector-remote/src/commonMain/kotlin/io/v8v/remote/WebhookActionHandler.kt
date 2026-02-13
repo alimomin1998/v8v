@@ -28,38 +28,42 @@ class WebhookActionHandler(
     private val config: WebhookConfig,
     httpClient: HttpClient? = null,
 ) : ActionHandler {
-
     override val scope: ActionScope = ActionScope.REMOTE
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
-
-    private val httpClient: HttpClient = httpClient ?: HttpClient {
-        install(ContentNegotiation) {
-            json(this@WebhookActionHandler.json)
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
         }
-    }
 
-    override suspend fun execute(intent: ResolvedIntent): ActionResult {
-        return try {
-            val payload = WebhookPayload(
-                intent = intent.intent,
-                extractedText = intent.extractedText,
-                rawText = intent.rawText,
-                language = intent.language,
-                timestamp = currentTimestamp(),
-            )
+    private val httpClient: HttpClient =
+        httpClient ?: HttpClient {
+            install(ContentNegotiation) {
+                json(this@WebhookActionHandler.json)
+            }
+        }
 
-            val response: WebhookResponse = httpClient.post(config.url) {
-                contentType(ContentType.Application.Json)
-                timeout { requestTimeoutMillis = config.timeoutMs }
-                headers {
-                    config.headers.forEach { (key, value) -> append(key, value) }
-                }
-                setBody(payload)
-            }.body()
+    override suspend fun execute(intent: ResolvedIntent): ActionResult =
+        try {
+            val payload =
+                WebhookPayload(
+                    intent = intent.intent,
+                    extractedText = intent.extractedText,
+                    rawText = intent.rawText,
+                    language = intent.language,
+                    timestamp = currentTimestamp(),
+                )
+
+            val response: WebhookResponse =
+                httpClient
+                    .post(config.url) {
+                        contentType(ContentType.Application.Json)
+                        timeout { requestTimeoutMillis = config.timeoutMs }
+                        headers {
+                            config.headers.forEach { (key, value) -> append(key, value) }
+                        }
+                        setBody(payload)
+                    }.body()
 
             if (response.success) {
                 ActionResult.Success(
@@ -82,7 +86,6 @@ class WebhookActionHandler(
                 message = "Webhook call failed: ${e.message}",
             )
         }
-    }
 
     /** Release HTTP client resources. */
     fun close() {

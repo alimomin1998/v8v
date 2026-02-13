@@ -4,7 +4,6 @@ package io.v8v.core
  * Result returned by an [ActionHandler] after executing an intent.
  */
 sealed class ActionResult {
-
     /** The intent's [ActionScope] that produced this result. */
     abstract val scope: ActionScope
 

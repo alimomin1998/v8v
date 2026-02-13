@@ -19,9 +19,8 @@ import kotlin.coroutines.resume
  * - `NSSpeechRecognitionUsageDescription`
  */
 class MacosPermissionHelper : PermissionHelper {
-
-    override suspend fun checkMicrophonePermission(): PermissionStatus {
-        return when (SFSpeechRecognizer.authorizationStatus()) {
+    override suspend fun checkMicrophonePermission(): PermissionStatus =
+        when (SFSpeechRecognizer.authorizationStatus()) {
             SFSpeechRecognizerAuthorizationStatus.SFSpeechRecognizerAuthorizationStatusAuthorized ->
                 PermissionStatus.GRANTED
             SFSpeechRecognizerAuthorizationStatus.SFSpeechRecognizerAuthorizationStatusDenied,
@@ -29,20 +28,23 @@ class MacosPermissionHelper : PermissionHelper {
                 PermissionStatus.DENIED
             else -> PermissionStatus.NOT_DETERMINED
         }
-    }
 
     override suspend fun requestMicrophonePermission(): PermissionStatus {
         // On macOS, microphone permission is handled at the entitlement/system level.
         // We only need to request speech recognition authorization.
-        val speechGranted = suspendCancellableCoroutine { continuation ->
-            SFSpeechRecognizer.requestAuthorization { status ->
-                if (continuation.isActive) {
-                    continuation.resume(
-                        status == SFSpeechRecognizerAuthorizationStatus.SFSpeechRecognizerAuthorizationStatusAuthorized,
-                    )
+        val authorizedStatus =
+            SFSpeechRecognizerAuthorizationStatus
+                .SFSpeechRecognizerAuthorizationStatusAuthorized
+        val speechGranted =
+            suspendCancellableCoroutine { continuation ->
+                SFSpeechRecognizer.requestAuthorization { status ->
+                    if (continuation.isActive) {
+                        continuation.resume(
+                            status == authorizedStatus,
+                        )
+                    }
                 }
             }
-        }
 
         return if (speechGranted) PermissionStatus.GRANTED else PermissionStatus.DENIED
     }

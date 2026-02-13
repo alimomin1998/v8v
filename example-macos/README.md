@@ -22,8 +22,8 @@ The app will request microphone and speech recognition permissions on first laun
 
 | Say | Action |
 |-----|--------|
-| "add milk" | Adds "milk" to todo list |
-| "remove milk" | Removes "milk" from list |
+| "add project status update" | Adds "project status update" to todo list |
+| "remove project status update" | Removes it from list |
 | "list todos" | Shows all todos in log |
 
 ## Entitlements

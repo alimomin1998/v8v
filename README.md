@@ -130,22 +130,49 @@ dependencies {
 **2. Use VoiceAgent:**
 
 ```kotlin
-val agent = VoiceAgent(
-    engine = createPlatformEngine(context),
-    config = VoiceAgentConfig(language = "en"),
+val config = VoiceAgentConfig(
+    language = "en-US",
+    continuous = true,
+    partialResults = true,
+    fuzzyThreshold = 0.3f,
+    silenceTimeoutMs = 1500L,
 )
 
+val agent = VoiceAgent(
+    engine = createPlatformEngine(context),
+    config = config,
+)
+
+// LOCAL action
 agent.registerAction(
-    intent = "todo.add",
-    phrases = mapOf("en" to listOf("add * to todo")),
+    intent = "task.create",
+    phrases = mapOf("en-US" to listOf("create task *", "add task *")),
 ) { resolved ->
-    addTodo(resolved.extractedText)
+    taskService.createTask(resolved.extractedText)
 }
+
+// MCP action
+val mcpClient = McpClient(McpServerConfig(name = "task-system", port = 3001))
+mcpClient.initialize()
+agent.registerAction(
+    intent = "task.sync",
+    phrases = mapOf("en-US" to listOf("sync task * with task system")),
+    handler = McpActionHandler(mcpClient, "create_task"),
+)
+
+// REMOTE action
+agent.registerAction(
+    intent = "meeting.followup",
+    phrases = mapOf("en-US" to listOf("send meeting follow up for *")),
+    handler = WebhookActionHandler(
+        WebhookConfig(url = "https://n8n.example.com/webhook/meeting-followup"),
+    ),
+)
 
 agent.start()
 ```
 
-Say **"add buy milk to todo"** — handler fires with `extractedText = "buy milk"`.
+Try: **"create task prepare Q3 budget draft"**.
 
 ### iOS / macOS (Swift)
 
@@ -188,13 +215,28 @@ agent.onError { msg in print("Error: \(msg)") }
 agent.onStateChange { state in print("State: \(state)") }
 agent.onUnhandled { text in print("No match: \(text)") }
 
-// Register actions
+// LOCAL action
 agent.registerAction(
-    intent: "todo.add",
-    phrases: ["en-US": ["add *", "add * to todo"]],
+    intent: "task.create",
+    phrases: ["en-US": ["create task *", "add task *"]],
     handler: { resolved in
-        print("Add: \(resolved.extractedText)")
+        print("Create task: \(resolved.extractedText)")
     }
+)
+
+// MCP and REMOTE actions use explicit handlers (via connector modules)
+// MCP action
+agent.registerActionWithHandler(
+    intent: "task.sync",
+    phrases: ["en-US": ["sync task * with task system"]],
+    handler: McpActionHandler(client: mcpClient, toolName: "create_task")
+)
+
+// REMOTE action
+agent.registerActionWithHandler(
+    intent: "meeting.followup",
+    phrases: ["en-US": ["send meeting follow up for *"]],
+    handler: WebhookActionHandler(config: WebhookConfig(url: "https://n8n.example.com/webhook/meeting-followup"))
 )
 
 agent.start()
@@ -218,8 +260,21 @@ npm install v8v-core
 ```javascript
 import { VoiceAgentJs } from 'v8v-core';
 
-const agent = new VoiceAgentJs('en');
-agent.registerPhrase('todo.add', 'en', 'add *');
+// Same quick-start config values used in Android and Apple examples
+const config = {
+  language: 'en-US',
+  continuous: true,
+  fuzzyThreshold: 0.3,
+  partialResults: true,   // handled internally by WebSpeechEngine defaults
+  silenceTimeoutMs: 1500, // handled by engine behavior
+};
+
+const agent = new VoiceAgentJs(config.language);
+agent.setContinuous(config.continuous);
+agent.setFuzzyThreshold(config.fuzzyThreshold);
+
+agent.registerPhrase('task.create', 'en-US', 'create task *');
+agent.registerPhrase('meeting.followup', 'en-US', 'send meeting follow up for *');
 agent.onTranscript(text => console.log('Heard:', text));
 agent.onIntent((intent, text) => console.log(intent, text));
 agent.onError(msg => console.error(msg));
@@ -300,16 +355,16 @@ Register `*` wildcard patterns and `{name}` named slots in any language:
 
 ```kotlin
 agent.registerAction(
-    intent = "todo.add",
+    intent = "task.create",
     phrases = mapOf(
-        "en" to listOf("add * to todo", "add *"),
-        "hi" to listOf("* todo mein add karo"),
-        "es" to listOf("agregar * a la lista"),
+        "en-US" to listOf("create task *", "add task *"),
+        "hi-IN" to listOf("* task banao"),
+        "es" to listOf("crear tarea *"),
     ),
 ) { /* ... */ }
 ```
 
-**Pass 1 -- Wildcard regex:** Pattern `add * to todo` becomes regex `^add (.+) to todo$`. Exact match gives confidence 1.0.
+**Pass 1 -- Wildcard regex:** Pattern `create task *` becomes regex `^create task (.+)$`. Exact match gives confidence 1.0.
 
 **Pass 2 -- Fuzzy (Dice similarity):** When `fuzzyThreshold > 0` and exact matching fails:
 
@@ -317,8 +372,8 @@ agent.registerAction(
 Dice = (2 * |intersection|) / (|A| + |B|)
 ```
 
-Example: Input "add milk to todo" (4 words), pattern literal words {add, to, todo} (3 words).
-`Dice = (2 * 3) / (4 + 3) = 0.86` -- match at threshold 0.5.
+Example: Input "create task prepare board review" (5 words), pattern literal words {create, task} (2 words).
+`Dice = (2 * 2) / (5 + 2) = 0.57` -- match at threshold 0.5.
 
 ---
 
@@ -337,7 +392,7 @@ agent.registerAction(
 )
 ```
 
-Say **"create task buy groceries"** — calls the `create_task` tool on the local MCP server.
+Say **"create task schedule stakeholder review"** — calls the `create_task` tool on the local MCP server.
 
 ## Remote Webhooks (n8n)
 
@@ -351,7 +406,7 @@ agent.registerAction(
 )
 ```
 
-Say **"notify meeting at 3pm"** — POSTs a JSON payload to the webhook.
+Say **"send meeting follow up for architecture review"** — POSTs a JSON payload to the webhook.
 
 ---
 
@@ -412,7 +467,7 @@ cd core/build/dist/js/productionLibrary && npm publish --access public
 1. Open in Android Studio
 2. Select `example-android` run configuration
 3. Run on a device with Google speech services
-4. Try: **"add milk"**, **"create task buy groceries"**, **"notify meeting at 3pm"**
+4. Try: **"create task finalize sprint report"**, **"create task schedule design review"**, **"send meeting follow up for product sync"**
 
 ### Web (all 3 scopes)
 
@@ -424,10 +479,10 @@ cd core/build/dist/js/productionLibrary && npm publish --access public
 3. In Settings, set MCP URL to `http://localhost:3001/mcp`
 4. Click the mic button
 5. Try:
-   - **"add milk"** -- LOCAL scope
-   - **"create task fix the bug"** -- MCP scope (requires MCP server)
-   - **"notify server is down"** -- REMOTE scope (requires webhook URL)
-   - **"list todos"** -- LOCAL scope
+   - **"create task finalize sprint report"** -- LOCAL scope
+   - **"create task schedule design review"** -- MCP scope (requires MCP server)
+   - **"send meeting follow up for product sync"** -- REMOTE scope (requires webhook URL)
+   - **"show my list"** -- LOCAL scope
 
 ### JVM CLI
 
@@ -441,9 +496,9 @@ cd core/build/dist/js/productionLibrary && npm publish --access public
    ```
 3. Type commands as if speaking:
    ```
-   > add buy milk
-   > create task fix the bug
-   > list todos
+   > create task finalize sprint report
+   > create task schedule design review
+   > show my list
    > quit
    ```
 
@@ -482,17 +537,6 @@ Automated release: `./scripts/release.sh 0.2.0`
 Tag-based CI publishing: push a `v*` tag to trigger the publish workflow (see `.github/workflows/publish.yml`).
 
 ---
-
-## Contributing
-
-Key areas where contributions are welcome:
-
-- Windows adapter (Windows Speech API / SAPI)
-- Linux adapter (Vosk or similar)
-- AI/ML-based intent matching
-- More MCP transport options (Android Bound Services)
-- Additional connectors (gRPC, MQTT)
-- Additional example apps
 
 ## License
 

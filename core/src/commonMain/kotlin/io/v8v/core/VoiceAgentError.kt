@@ -8,7 +8,6 @@ package io.v8v.core
  * with distinct UI or recovery logic.
  */
 sealed class VoiceAgentError {
-
     /** Human-readable description of the error. */
     abstract val message: String
 

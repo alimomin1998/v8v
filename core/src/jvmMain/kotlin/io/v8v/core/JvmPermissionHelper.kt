@@ -7,10 +7,7 @@ package io.v8v.core
  * returns [PermissionStatus.GRANTED].
  */
 class JvmPermissionHelper : PermissionHelper {
+    override suspend fun checkMicrophonePermission(): PermissionStatus = PermissionStatus.GRANTED
 
-    override suspend fun checkMicrophonePermission(): PermissionStatus =
-        PermissionStatus.GRANTED
-
-    override suspend fun requestMicrophonePermission(): PermissionStatus =
-        PermissionStatus.GRANTED
+    override suspend fun requestMicrophonePermission(): PermissionStatus = PermissionStatus.GRANTED
 }

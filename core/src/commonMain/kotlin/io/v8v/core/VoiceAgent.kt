@@ -2,7 +2,6 @@ package io.v8v.core
 
 import io.v8v.core.model.ResolvedIntent
 import io.v8v.core.model.VoiceAgentConfig
-import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
 
 /**
  * State of the [VoiceAgent] lifecycle.
@@ -23,8 +23,10 @@ import kotlinx.coroutines.launch
 enum class AgentState {
     /** Not listening. Waiting for [VoiceAgent.start]. */
     IDLE,
+
     /** Actively listening for speech via the engine. */
     LISTENING,
+
     /** Processing a transcript through intent resolution. */
     PROCESSING,
 }
@@ -95,31 +97,38 @@ class VoiceAgent(
             engine.startListening(newConfig.language)
         }
     }
+
     private val intentResolver = IntentResolver()
     private val actionRouter = ActionRouter()
     private val scope = CoroutineScope(coroutineContext + SupervisorJob())
 
     private val _state = MutableStateFlow(AgentState.IDLE)
+
     /** Current agent state. */
     val state: StateFlow<AgentState> = _state.asStateFlow()
 
     private val _transcript = MutableSharedFlow<String>(extraBufferCapacity = 16)
+
     /** Emits every final (and optionally partial) transcript received from the engine. */
     val transcript: SharedFlow<String> = _transcript.asSharedFlow()
 
     private val _unhandledText = MutableSharedFlow<String>(extraBufferCapacity = 16)
+
     /** Emits transcripts that did not match any registered intent. */
     val unhandledText: SharedFlow<String> = _unhandledText.asSharedFlow()
 
     private val _errors = MutableSharedFlow<VoiceAgentError>(extraBufferCapacity = 16)
+
     /** Emits structured errors for permission, engine, and action failures. */
     val errors: SharedFlow<VoiceAgentError> = _errors.asSharedFlow()
 
     private val _actionResults = MutableSharedFlow<ActionResult>(extraBufferCapacity = 16)
+
     /** Emits the [ActionResult] from every dispatched action (success or error). */
     val actionResults: SharedFlow<ActionResult> = _actionResults.asSharedFlow()
 
     private val _audioLevel = MutableStateFlow(0f)
+
     /**
      * Normalized audio input level (0.0–1.0) updated in real-time while listening.
      *
@@ -188,28 +197,29 @@ class VoiceAgent(
     fun start() {
         if (listeningJob?.isActive == true) return
 
-        listeningJob = scope.launch {
-            // Check (and request if needed) permission when a helper is available.
-            if (permissionHelper != null) {
-                var status = permissionHelper.checkMicrophonePermission()
-                if (status == PermissionStatus.NOT_DETERMINED) {
-                    status = permissionHelper.requestMicrophonePermission()
+        listeningJob =
+            scope.launch {
+                // Check (and request if needed) permission when a helper is available.
+                if (permissionHelper != null) {
+                    var status = permissionHelper.checkMicrophonePermission()
+                    if (status == PermissionStatus.NOT_DETERMINED) {
+                        status = permissionHelper.requestMicrophonePermission()
+                    }
+                    if (status != PermissionStatus.GRANTED) {
+                        _errors.emit(VoiceAgentError.PermissionDenied(status))
+                        _state.value = AgentState.IDLE
+                        return@launch
+                    }
                 }
-                if (status != PermissionStatus.GRANTED) {
-                    _errors.emit(VoiceAgentError.PermissionDenied(status))
-                    _state.value = AgentState.IDLE
-                    return@launch
+
+                // Start collecting engine events (before startListening so we don't miss events).
+                engine.startListening(_config.language)
+                _state.value = AgentState.LISTENING
+
+                engine.events.collect { event ->
+                    handleEvent(event)
                 }
             }
-
-            // Start collecting engine events (before startListening so we don't miss events).
-            engine.startListening(_config.language)
-            _state.value = AgentState.LISTENING
-
-            engine.events.collect { event ->
-                handleEvent(event)
-            }
-        }
     }
 
     /** Stop listening. The agent moves to [AgentState.IDLE]. */
@@ -259,15 +269,16 @@ class VoiceAgent(
                 if (timeoutMs > 0) {
                     lastPartialText = event.text
                     silencePromotionJob?.cancel()
-                    silencePromotionJob = scope.launch {
-                        delay(timeoutMs)
-                        val text = lastPartialText ?: return@launch
-                        lastPartialText = null
-                        // Do NOT call engine.stopListening() here — processFinalResult
-                        // will call engine.startListening() (which stops first) in
-                        // continuous mode, or stop() will be called in non-continuous.
-                        processFinalResult(text)
-                    }
+                    silencePromotionJob =
+                        scope.launch {
+                            delay(timeoutMs)
+                            val text = lastPartialText ?: return@launch
+                            lastPartialText = null
+                            // Do NOT call engine.stopListening() here — processFinalResult
+                            // will call engine.startListening() (which stops first) in
+                            // continuous mode, or stop() will be called in non-continuous.
+                            processFinalResult(text)
+                        }
                 }
             }
 
@@ -348,14 +359,15 @@ class VoiceAgent(
          * during normal operation and should not trigger error events or
          * cause continuous-mode restart loops.
          */
-        val BENIGN_ERROR_CODES = setOf(
-            1110,  // kAFAssistantErrorDomain: No speech detected
-            216,   // kAFAssistantErrorDomain: Request was cancelled
-            301,   // kAFAssistantErrorDomain: Recognition retry
-            203,   // kAFAssistantErrorDomain: Retry
-            102,   // kAFAssistantErrorDomain: Assets not installed
-            201,   // kAFAssistantErrorDomain: Request was superseded
-            209,   // kAFAssistantErrorDomain: Connection invalidated
-        )
+        val BENIGN_ERROR_CODES =
+            setOf(
+                1110, // kAFAssistantErrorDomain: No speech detected
+                216, // kAFAssistantErrorDomain: Request was cancelled
+                301, // kAFAssistantErrorDomain: Recognition retry
+                203, // kAFAssistantErrorDomain: Retry
+                102, // kAFAssistantErrorDomain: Assets not installed
+                201, // kAFAssistantErrorDomain: Request was superseded
+                209, // kAFAssistantErrorDomain: Connection invalidated
+            )
     }
 }

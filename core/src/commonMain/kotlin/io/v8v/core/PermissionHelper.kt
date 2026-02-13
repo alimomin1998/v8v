@@ -33,7 +33,6 @@ enum class PermissionStatus {
  * ```
  */
 interface PermissionHelper {
-
     /**
      * Check the current microphone permission status without prompting the user.
      */

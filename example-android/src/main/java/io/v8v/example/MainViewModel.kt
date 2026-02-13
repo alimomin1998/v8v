@@ -8,7 +8,6 @@ import io.v8v.core.ActionResult
 import io.v8v.core.ActionScope
 import io.v8v.core.AgentState
 import io.v8v.core.VoiceAgent
-import io.v8v.core.VoiceAgentError
 import io.v8v.core.createPlatformEngine
 import io.v8v.core.model.VoiceAgentConfig
 import io.v8v.mcp.McpActionHandler
@@ -28,8 +27,9 @@ import kotlinx.coroutines.launch
  * 2. MCP    — "create task <item>" → local MCP server (mock)
  * 3. REMOTE — "notify <message>" → n8n webhook (configurable URL)
  */
-class MainViewModel(application: Application) : AndroidViewModel(application) {
-
+class MainViewModel(
+    application: Application
+) : AndroidViewModel(application) {
     private companion object {
         const val TAG = "VoiceTodoDemo"
         const val MCP_PORT = 3001
@@ -68,18 +68,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val mockMcpServer = MockMcpServer(MCP_PORT)
     private val engine = createPlatformEngine(application.applicationContext)
 
-    private val voiceAgent = VoiceAgent(
-        engine = engine,
-        config = VoiceAgentConfig(),
-    )
+    private val voiceAgent =
+        VoiceAgent(
+            engine = engine,
+            config = VoiceAgentConfig(),
+        )
 
     val agentState: StateFlow<AgentState> = voiceAgent.state
     val audioLevel: StateFlow<Float> = voiceAgent.audioLevel
 
     // MCP client
-    private val mcpClient = McpClient(
-        McpServerConfig(name = "mock-task-app", port = MCP_PORT),
-    )
+    private val mcpClient =
+        McpClient(
+            McpServerConfig(name = "mock-task-app", port = MCP_PORT),
+        )
 
     // Webhook handler (created lazily when URL is set)
     private var webhookHandler: WebhookActionHandler? = null
@@ -103,22 +105,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // ---- 1. LOCAL: "add <item>" → in-app todo list ----
         voiceAgent.registerAction(
             intent = "todo.add",
-            phrases = mapOf(
-                "en" to listOf(
-                    "add *",
-                    "add * to todo",
-                    "add * to do",
-                    "add * todo",
-                    "todo *",
-                    "add * to my list",
-                    "add * to the list",
+            phrases =
+                mapOf(
+                    "en" to
+                        listOf(
+                            "add *",
+                            "add * to todo",
+                            "add * to do",
+                            "add * todo",
+                            "todo *",
+                            "add * to my list",
+                            "add * to the list",
+                        ),
+                    "hi" to
+                        listOf(
+                            "* todo mein add karo",
+                            "todo mein * add karo",
+                            "* list mein add karo",
+                        ),
                 ),
-                "hi" to listOf(
-                    "* todo mein add karo",
-                    "todo mein * add karo",
-                    "* list mein add karo",
-                ),
-            ),
         ) { resolved ->
             _todos.value = _todos.value + resolved.extractedText
             _lastTranscript.value = resolved.rawText
@@ -127,13 +132,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // ---- 2. MCP: "create task <item>" → local MCP server ----
         voiceAgent.registerAction(
             intent = "task.create",
-            phrases = mapOf(
-                "en" to listOf(
-                    "create task *",
-                    "new task *",
-                    "task *",
+            phrases =
+                mapOf(
+                    "en" to
+                        listOf(
+                            "create task *",
+                            "new task *",
+                            "task *",
+                        ),
                 ),
-            ),
             handler = McpActionHandler(mcpClient, "create_task"),
         )
 
@@ -142,16 +149,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // when the user sets a URL via setWebhookUrl().
         voiceAgent.registerAction(
             intent = "notify.team",
-            phrases = mapOf(
-                "en" to listOf(
-                    "notify *",
-                    "send notification *",
-                    "alert *",
+            phrases =
+                mapOf(
+                    "en" to
+                        listOf(
+                            "notify *",
+                            "send notification *",
+                            "alert *",
+                        ),
                 ),
-            ),
-            handler = WebhookActionHandler(
-                WebhookConfig(url = "http://localhost/placeholder"),
-            ),
+            handler =
+                WebhookActionHandler(
+                    WebhookConfig(url = "http://localhost/placeholder"),
+                ),
         )
 
         // ---- Collect flows ----
@@ -198,8 +208,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun startListening() { voiceAgent.start() }
-    fun stopListening() { voiceAgent.stop() }
+    fun startListening() {
+        voiceAgent.start()
+    }
+
+    fun stopListening() {
+        voiceAgent.stop()
+    }
 
     fun setLanguage(lang: String) {
         _language.value = lang
@@ -217,19 +232,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun applyConfig() {
-        val newConfig = VoiceAgentConfig(
-            language = _language.value,
-            continuous = _continuous.value,
-            fuzzyThreshold = _fuzzyThreshold.value,
-        )
+        val newConfig =
+            VoiceAgentConfig(
+                language = _language.value,
+                continuous = _continuous.value,
+                fuzzyThreshold = _fuzzyThreshold.value,
+            )
         voiceAgent.updateConfig(newConfig)
-        appendLog("[CONFIG] lang=${newConfig.language}, continuous=${newConfig.continuous}, fuzzy=${newConfig.fuzzyThreshold}")
+        appendLog(
+            "[CONFIG] lang=${newConfig.language}, continuous=${newConfig.continuous}, fuzzy=${newConfig.fuzzyThreshold}"
+        )
     }
 
     fun removeTodo(index: Int) {
-        _todos.value = _todos.value.toMutableList().apply {
-            if (index in indices) removeAt(index)
-        }
+        _todos.value =
+            _todos.value.toMutableList().apply {
+                if (index in indices) removeAt(index)
+            }
     }
 
     /**
@@ -243,9 +262,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             webhookHandler = WebhookActionHandler(WebhookConfig(url = url))
             voiceAgent.registerAction(
                 intent = "notify.team",
-                phrases = mapOf(
-                    "en" to listOf("notify *", "send notification *", "alert *"),
-                ),
+                phrases =
+                    mapOf(
+                        "en" to listOf("notify *", "send notification *", "alert *"),
+                    ),
                 handler = webhookHandler!!,
             )
             appendLog("[REMOTE] Webhook URL set: $url")
@@ -264,9 +284,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _debugLog.value = (_debugLog.value + line).takeLast(12)
     }
 
-    private fun scopeBadge(scope: ActionScope): String = when (scope) {
-        ActionScope.LOCAL -> "[LOCAL]"
-        ActionScope.MCP -> "[MCP]"
-        ActionScope.REMOTE -> "[REMOTE]"
-    }
+    private fun scopeBadge(scope: ActionScope): String =
+        when (scope) {
+            ActionScope.LOCAL -> "[LOCAL]"
+            ActionScope.MCP -> "[MCP]"
+            ActionScope.REMOTE -> "[REMOTE]"
+        }
 }

@@ -35,7 +35,6 @@ class AndroidPermissionHelper(
     private val context: Context,
     private val requestCallback: ((onResult: (Boolean) -> Unit) -> Unit)? = null,
 ) : PermissionHelper {
-
     override suspend fun checkMicrophonePermission(): PermissionStatus {
         val result = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO)
         return if (result == PackageManager.PERMISSION_GRANTED) {

@@ -18,7 +18,6 @@ import io.v8v.mcp.model.McpToolListResult
 import io.v8v.mcp.model.McpToolResult
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 
@@ -38,16 +37,18 @@ class McpClient(
     private val config: McpServerConfig,
     httpClient: HttpClient? = null,
 ) {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
-
-    private val httpClient: HttpClient = httpClient ?: HttpClient {
-        install(ContentNegotiation) {
-            json(this@McpClient.json)
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
         }
-    }
+
+    private val httpClient: HttpClient =
+        httpClient ?: HttpClient {
+            install(ContentNegotiation) {
+                json(this@McpClient.json)
+            }
+        }
 
     private var nextRequestId = 0
 
@@ -78,14 +79,19 @@ class McpClient(
      * @param arguments Tool arguments as a JSON object.
      * @return The tool result.
      */
-    suspend fun callTool(name: String, arguments: JsonObject? = null): McpToolResult {
+    suspend fun callTool(
+        name: String,
+        arguments: JsonObject? = null
+    ): McpToolResult {
         val params = json.encodeToJsonElement(McpToolCallParams(name, arguments)).jsonObject
         val response = rpc("tools/call", params)
         if (response.error != null) {
             return McpToolResult(
-                content = listOf(
-                    io.v8v.mcp.model.McpContent(text = response.error.message),
-                ),
+                content =
+                    listOf(
+                        io.v8v.mcp.model
+                            .McpContent(text = response.error.message),
+                    ),
                 isError = true,
             )
         }
@@ -99,15 +105,20 @@ class McpClient(
 
     // ---- internal ----
 
-    private suspend fun rpc(method: String, params: JsonObject? = null): JsonRpcResponse {
-        val request = JsonRpcRequest(
-            id = ++nextRequestId,
-            method = method,
-            params = params,
-        )
-        return httpClient.post(config.url) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
+    private suspend fun rpc(
+        method: String,
+        params: JsonObject? = null
+    ): JsonRpcResponse {
+        val request =
+            JsonRpcRequest(
+                id = ++nextRequestId,
+                method = method,
+                params = params,
+            )
+        return httpClient
+            .post(config.url) {
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }.body()
     }
 }
