@@ -3,6 +3,7 @@ package io.v8v.core
 import android.speech.SpeechRecognizer
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -27,23 +28,35 @@ import org.junit.runner.RunWith
 class AndroidSpeechEngineTest {
 
     private var engine: AndroidSpeechEngine? = null
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+
+    private fun <T> runOnMainSync(block: () -> T): T {
+        val result = AtomicReference<T>()
+        instrumentation.runOnMainSync {
+            result.set(block())
+        }
+        return result.get()
+    }
 
     @After
     fun tearDown() {
-        engine?.destroy()
+        runOnMainSync {
+            engine?.destroy()
+            engine = null
+        }
     }
 
     @Test
     fun engine_can_be_created() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        engine = AndroidSpeechEngine(context)
+        engine = runOnMainSync { AndroidSpeechEngine(context) }
         assertNotNull(engine)
     }
 
     @Test
     fun engine_reports_not_listening_initially() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        engine = AndroidSpeechEngine(context)
+        engine = runOnMainSync { AndroidSpeechEngine(context) }
         assertFalse(engine!!.isListening.value)
     }
 
@@ -57,23 +70,23 @@ class AndroidSpeechEngineTest {
             SpeechRecognizer.isRecognitionAvailable(context),
         )
 
-        engine = AndroidSpeechEngine(context)
+        engine = runOnMainSync { AndroidSpeechEngine(context) }
 
-        engine!!.startListening("en")
+        runOnMainSync { engine!!.startListening("en") }
 
         // Give it a moment to initialize, then stop
         Thread.sleep(500)
-        engine!!.stopListening()
+        runOnMainSync { engine!!.stopListening() }
         assertFalse(engine!!.isListening.value)
     }
 
     @Test
     fun engine_destroy_is_idempotent() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        engine = AndroidSpeechEngine(context)
+        engine = runOnMainSync { AndroidSpeechEngine(context) }
 
-        engine!!.destroy()
-        engine!!.destroy() // Second call should not crash
+        runOnMainSync { engine!!.destroy() }
+        runOnMainSync { engine!!.destroy() } // Second call should not crash
         engine = null // Prevent double-destroy in tearDown
     }
 }
