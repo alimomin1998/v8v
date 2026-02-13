@@ -44,8 +44,14 @@ subprojects {
                         name = "MavenCentral"
                         url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
                         credentials {
-                            username = findProperty("sonatype.username") as String? ?: System.getenv("SONATYPE_USERNAME") ?: ""
-                            password = findProperty("sonatype.password") as String? ?: System.getenv("SONATYPE_PASSWORD") ?: ""
+                            username =
+                                findProperty("sonatype.username") as String?
+                                    ?: System.getenv("SONATYPE_USERNAME")
+                                    ?: ""
+                            password =
+                                findProperty("sonatype.password") as String?
+                                    ?: System.getenv("SONATYPE_PASSWORD")
+                                    ?: ""
                         }
                     }
                 }

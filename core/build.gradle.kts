@@ -87,12 +87,14 @@ kotlin {
 // metadata tasks using taskGraph.whenReady (runs after all tasks exist).
 // ─────────────────────────────────────────────────────────────────────
 gradle.taskGraph.whenReady {
-    allTasks.filter {
-        it.name == "compileAppleMainKotlinMetadata" ||
-        it.name == "compileIosMainKotlinMetadata" ||
-        it.name == "compileMacosMainKotlinMetadata" ||
-        it.name == "compileNativeMainKotlinMetadata"
-    }.forEach { it.enabled = false }
+    val metadataTasks =
+        allTasks.filter {
+            it.name == "compileAppleMainKotlinMetadata" ||
+                it.name == "compileIosMainKotlinMetadata" ||
+                it.name == "compileMacosMainKotlinMetadata" ||
+                it.name == "compileNativeMainKotlinMetadata"
+        }
+    metadataTasks.forEach { it.enabled = false }
 }
 
 android {
