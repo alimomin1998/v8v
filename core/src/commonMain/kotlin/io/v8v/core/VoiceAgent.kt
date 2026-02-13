@@ -97,7 +97,7 @@ class VoiceAgent(
     }
     private val intentResolver = IntentResolver()
     private val actionRouter = ActionRouter()
-    private val scope = CoroutineScope(SupervisorJob() + coroutineContext)
+    private val scope = CoroutineScope(coroutineContext + SupervisorJob())
 
     private val _state = MutableStateFlow(AgentState.IDLE)
     /** Current agent state. */

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -89,6 +90,7 @@ class VoiceAgentTest {
         }
 
         agent.start()
+        advanceUntilIdle() // ensure collection coroutine is active
 
         // Simulate engine producing a final result
         engine.emit(SpeechEvent.FinalResult("add milk"))
@@ -126,6 +128,7 @@ class VoiceAgentTest {
         }
 
         agent.start()
+        advanceUntilIdle() // ensure collection coroutine is active
         engine.emit(SpeechEvent.FinalResult("hello world"))
         advanceTimeBy(100)
 
@@ -154,6 +157,7 @@ class VoiceAgentTest {
         ) { handlerCalled = true }
 
         agent.start()
+        advanceUntilIdle() // ensure collection coroutine is active
 
         // Emit partial result (no isFinal)
         engine.emit(SpeechEvent.PartialResult("add milk"))
@@ -185,6 +189,7 @@ class VoiceAgentTest {
         ) { resolved -> extractedText = resolved.extractedText }
 
         agent.start()
+        advanceUntilIdle() // ensure collection coroutine is active
 
         // First partial
         engine.emit(SpeechEvent.PartialResult("add"))
@@ -217,6 +222,7 @@ class VoiceAgentTest {
         ) { }
 
         agent.start()
+        advanceUntilIdle() // ensure collection coroutine is active
         val startsBefore = engine.startCount
 
         engine.emit(SpeechEvent.FinalResult("add milk"))
@@ -238,7 +244,7 @@ class VoiceAgentTest {
         )
 
         agent.start()
-        advanceTimeBy(100)
+        advanceUntilIdle() // ensure collection coroutine is active
         val startsBefore = engine.startCount
 
         // Change language while listening
@@ -269,6 +275,7 @@ class VoiceAgentTest {
         ) { handlerCalled = true }
 
         agent.start()
+        advanceUntilIdle() // ensure collection coroutine is active
         engine.emit(SpeechEvent.PartialResult("add milk"))
         advanceTimeBy(500)
 
@@ -298,6 +305,7 @@ class VoiceAgentTest {
         }
 
         agent.start()
+        advanceUntilIdle() // ensure collection coroutine is active
 
         // Code 1110 = "No speech detected" — benign, should be filtered
         engine.emit(SpeechEvent.Error(code = 1110, message = "No speech detected"))

@@ -1,37 +1,30 @@
 package io.v8v.core
 
-import android.Manifest
+import android.speech.SpeechRecognizer
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.rule.GrantPermissionRule
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
-import org.junit.Rule
+import org.junit.Assume
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
  * Android instrumented tests for [AndroidSpeechEngine].
  *
- * These tests run on a real device or emulator with Google speech services.
- * They validate that the engine can be created, started, and stopped
- * without crashing — actual speech input is not tested (requires a mic).
+ * These tests run on a real device or emulator. They validate that the engine
+ * can be created, started, and stopped without crashing — actual speech input
+ * is not tested (requires a mic).
+ *
+ * Tests that call [AndroidSpeechEngine.startListening] are skipped on
+ * emulators without speech recognition services (typical for CI).
  *
  * Run with:
  *   ./gradlew :core:connectedAndroidTest
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidSpeechEngineTest {
-
-    @get:Rule
-    val permissionRule: GrantPermissionRule = GrantPermissionRule.grant(
-        Manifest.permission.RECORD_AUDIO,
-    )
 
     private var engine: AndroidSpeechEngine? = null
 
@@ -57,6 +50,13 @@ class AndroidSpeechEngineTest {
     @Test
     fun engine_start_and_stop_cycle() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        // Skip on emulators without speech recognition (e.g. CI runners)
+        Assume.assumeTrue(
+            "SpeechRecognizer not available — skipping",
+            SpeechRecognizer.isRecognitionAvailable(context),
+        )
+
         engine = AndroidSpeechEngine(context)
 
         engine!!.startListening("en")
