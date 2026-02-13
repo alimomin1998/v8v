@@ -1,6 +1,7 @@
 package io.v8v.core
 
 import io.v8v.core.model.VoiceAgentConfig
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -21,6 +22,7 @@ import kotlin.test.assertIs
  *
  * Uses a [FakeEngine] to inject speech events without a real microphone.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class VoiceAgentTest {
 
     // ── Fake engine for testing ──
@@ -68,7 +70,7 @@ class VoiceAgentTest {
             continuous = false,
             silenceTimeoutMs = 0, // disable silence promotion for this test
         )
-        val agent = VoiceAgent(engine = engine, config = config)
+        val agent = VoiceAgent(engine = engine, config = config, coroutineContext = coroutineContext)
 
         var handlerCalled = false
         var extractedText = ""
@@ -111,7 +113,7 @@ class VoiceAgentTest {
             continuous = false,
             silenceTimeoutMs = 0,
         )
-        val agent = VoiceAgent(engine = engine, config = config)
+        val agent = VoiceAgent(engine = engine, config = config, coroutineContext = coroutineContext)
 
         agent.registerAction(
             intent = "todo.add",
@@ -143,7 +145,7 @@ class VoiceAgentTest {
             partialResults = true,
             silenceTimeoutMs = 1000, // 1 second timeout
         )
-        val agent = VoiceAgent(engine = engine, config = config)
+        val agent = VoiceAgent(engine = engine, config = config, coroutineContext = coroutineContext)
 
         var handlerCalled = false
         agent.registerAction(
@@ -174,7 +176,7 @@ class VoiceAgentTest {
             partialResults = true,
             silenceTimeoutMs = 1000,
         )
-        val agent = VoiceAgent(engine = engine, config = config)
+        val agent = VoiceAgent(engine = engine, config = config, coroutineContext = coroutineContext)
 
         var extractedText = ""
         agent.registerAction(
@@ -207,7 +209,7 @@ class VoiceAgentTest {
             continuous = true,
             silenceTimeoutMs = 0,
         )
-        val agent = VoiceAgent(engine = engine, config = config)
+        val agent = VoiceAgent(engine = engine, config = config, coroutineContext = coroutineContext)
 
         agent.registerAction(
             intent = "todo.add",
@@ -232,6 +234,7 @@ class VoiceAgentTest {
         val agent = VoiceAgent(
             engine = engine,
             config = VoiceAgentConfig(language = "en"),
+            coroutineContext = coroutineContext,
         )
 
         agent.start()
@@ -257,7 +260,7 @@ class VoiceAgentTest {
             partialResults = true,
             silenceTimeoutMs = 1000,
         )
-        val agent = VoiceAgent(engine = engine, config = config)
+        val agent = VoiceAgent(engine = engine, config = config, coroutineContext = coroutineContext)
 
         var handlerCalled = false
         agent.registerAction(
@@ -287,7 +290,7 @@ class VoiceAgentTest {
             continuous = true,
             silenceTimeoutMs = 0,
         )
-        val agent = VoiceAgent(engine = engine, config = config)
+        val agent = VoiceAgent(engine = engine, config = config, coroutineContext = coroutineContext)
 
         val errors = mutableListOf<VoiceAgentError>()
         val collectJob = launch {

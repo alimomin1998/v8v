@@ -18,11 +18,6 @@ android {
         multiDexEnabled = true
     }
 
-    @Suppress("DEPRECATION")
-    dexOptions {
-        javaMaxHeapSize = "4g"
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = false

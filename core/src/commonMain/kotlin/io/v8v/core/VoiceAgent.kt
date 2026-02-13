@@ -2,6 +2,7 @@ package io.v8v.core
 
 import io.v8v.core.model.ResolvedIntent
 import io.v8v.core.model.VoiceAgentConfig
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,11 +61,15 @@ enum class AgentState {
  * @param permissionHelper Optional platform permission helper. When provided,
  *   [start] checks microphone permission before listening and emits an error
  *   if permission is denied.
+ * @param coroutineContext The [CoroutineContext] used for the agent's internal
+ *   coroutine scope. Defaults to [Dispatchers.Default]. On Android you may
+ *   pass [Dispatchers.Main]; in tests pass the test dispatcher.
  */
 class VoiceAgent(
     private val engine: SpeechRecognitionEngine,
     config: VoiceAgentConfig = VoiceAgentConfig(),
     private val permissionHelper: PermissionHelper? = null,
+    coroutineContext: CoroutineContext = Dispatchers.Default,
 ) {
     private var _config: VoiceAgentConfig = config
 
@@ -92,7 +97,7 @@ class VoiceAgent(
     }
     private val intentResolver = IntentResolver()
     private val actionRouter = ActionRouter()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + coroutineContext)
 
     private val _state = MutableStateFlow(AgentState.IDLE)
     /** Current agent state. */
