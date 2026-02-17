@@ -20,7 +20,9 @@ data class McpServerConfig(
 
     companion object {
         /** Create a config from a full URL (e.g. "http://localhost:3001/mcp"). */
-        fun fromUrl(name: String, url: String): McpServerConfig =
-            McpServerConfig(name = name, baseUrl = url)
+        fun fromUrl(
+            name: String,
+            url: String,
+        ): McpServerConfig = McpServerConfig(name = name, baseUrl = url)
     }
 }
