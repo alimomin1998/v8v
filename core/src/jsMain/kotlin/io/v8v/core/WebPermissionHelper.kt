@@ -12,33 +12,30 @@ import kotlin.js.Promise
 class WebPermissionHelper : PermissionHelper {
     override suspend fun checkMicrophonePermission(): PermissionStatus =
         try {
-            val navigator = js("navigator")
-            val permissions = navigator.permissions
-            if (permissions != null) {
-                val result = (permissions.query(js("{name: 'microphone'}")) as Promise<dynamic>).await()
+            val permissions = js("navigator.permissions")
+            if (permissions != null && permissions != undefined) {
+                val queryArg = js("({name: 'microphone'})")
+                val result = (permissions.query(queryArg) as Promise<dynamic>).await()
                 when (result.state as String) {
                     "granted" -> PermissionStatus.GRANTED
                     "denied" -> PermissionStatus.DENIED
                     else -> PermissionStatus.NOT_DETERMINED
                 }
             } else {
+                // Permissions API not available — try requesting directly
                 PermissionStatus.NOT_DETERMINED
             }
         } catch (_: dynamic) {
+            // Query failed — treat as undetermined so we attempt getUserMedia
             PermissionStatus.NOT_DETERMINED
         }
 
     override suspend fun requestMicrophonePermission(): PermissionStatus =
         try {
-            val navigator = js("navigator")
-            val mediaDevices = navigator.mediaDevices
-            if (mediaDevices != null) {
-                val stream =
-                    (
-                        mediaDevices.getUserMedia(
-                            js("{audio: true}"),
-                        ) as Promise<dynamic>
-                    ).await()
+            val mediaDevices = js("navigator.mediaDevices")
+            if (mediaDevices != null && mediaDevices != undefined) {
+                val constraints = js("({audio: true})")
+                val stream = (mediaDevices.getUserMedia(constraints) as Promise<dynamic>).await()
                 // Got permission — stop the stream immediately (we just needed the permission)
                 val tracks = stream.getTracks() as Array<dynamic>
                 tracks.forEach { track -> track.stop() }
@@ -46,7 +43,10 @@ class WebPermissionHelper : PermissionHelper {
             } else {
                 PermissionStatus.DENIED
             }
-        } catch (_: dynamic) {
+        } catch (e: dynamic) {
+            console.log("Microphone permission request failed:", e)
             PermissionStatus.DENIED
         }
+
+    private val console get() = js("console")
 }

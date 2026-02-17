@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "io.v8v.example"
+    namespace = "io.v8v.poc"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "io.v8v.example"
+        applicationId = "io.v8v.poc"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
@@ -47,9 +47,12 @@ android {
 }
 
 dependencies {
+    // V8V library — single package (includes LOCAL + MCP + Remote)
+    // Uses local project for development; switch to published artifact after next release:
+    // implementation("io.github.alimomin1998:core-android:0.4.0")
     implementation(project(":core"))
-    implementation(project(":connector-mcp"))
-    implementation(project(":connector-remote"))
+
+    // Android / Compose
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -59,13 +62,16 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
-    // Ktor client (for MCP + webhook connectors)
+
+    // Ktor client (required by MCP + webhook support in core)
     implementation(libs.ktor.client.okhttp)
-    // Ktor server (mock MCP server for demo only)
+
+    // Ktor server (embedded mock MCP server for demo)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.cio)
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.serialization.json)
     implementation(libs.kotlinx.serialization.json)
+
     debugImplementation(libs.compose.ui.tooling)
 }

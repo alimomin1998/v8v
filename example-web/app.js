@@ -1,25 +1,28 @@
 /**
- * V8V Web Demo
+ * V8V Example — Web app using the v8v-core library.
  *
  * Demonstrates all three action scopes:
- *   1. LOCAL  — "add <item>" → in-app todo list
- *   2. MCP    — "create task <item>" → local MCP server (JSON-RPC 2.0)
- *   3. REMOTE — "notify <message>" → remote webhook (n8n, Zapier, etc.)
+ *   1. LOCAL  — "add <item>" → in-app task list (JS handler)
+ *   2. MCP    — "create task <item>" → MCP server (library McpClient via Ktor)
+ *   3. REMOTE — "notify <message>" → webhook (library WebhookActionHandler via Ktor)
  *
- * When consuming the Kotlin/JS npm package, replace the logic below with
- * the VoiceAgentJs facade. This demo re-implements intent matching in
- * plain JS so it works without a bundler — just open index.html in Chrome.
+ * All three action scopes use the v8v-core library engine, including MCP/webhook
+ * HTTP calls which use the library's built-in Ktor HTTP client (Ktor's JS engine
+ * uses the browser's fetch() API internally, so CORS behaviour is identical).
  */
 
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // State
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 
 let listening = false;
-let recognition = null;          // single instance, reused across start/stop
-let micPermissionGranted = false; // tracks if mic permission was already obtained
+let recognition = null;
 let todos = [];
-let config = {
+let agent = null;
+let usingLibrary = false;
+let micPermissionGranted = false;
+
+const config = {
     language: 'en',
     continuous: false,
     fuzzyThreshold: 0.0,
@@ -27,60 +30,132 @@ let config = {
     webhookUrl: '',
 };
 
-// ═══════════════════════════════════════════════════════════════════════
-// Registered phrases (intent → patterns)
-// ═══════════════════════════════════════════════════════════════════════
-
+// Intent metadata for fallback and scope lookup
 const intents = [
-    // LOCAL
-    {
-        name: 'todo.add',
-        scope: 'LOCAL',
-        patterns: ['add *', 'add * to todo', 'add * to my list', 'add * to the list'],
-    },
-    {
-        name: 'todo.remove',
-        scope: 'LOCAL',
-        patterns: ['remove *', 'delete *', 'remove * from list'],
-    },
-    {
-        name: 'todo.list',
-        scope: 'LOCAL',
-        patterns: ['list todos', 'show todos', 'show my list', 'what are my todos'],
-    },
-    // MCP
-    {
-        name: 'task.create',
-        scope: 'MCP',
-        patterns: ['create task *', 'new task *', 'task *'],
-    },
-    // REMOTE
-    {
-        name: 'notify.team',
-        scope: 'REMOTE',
-        patterns: ['notify *', 'send notification *', 'alert *'],
-    },
+    { name: 'todo.add', scope: 'LOCAL', patterns: ['add *', 'add * to todo', 'add * to my list'] },
+    { name: 'todo.remove', scope: 'LOCAL', patterns: ['remove *', 'delete *'] },
+    { name: 'todo.list', scope: 'LOCAL', patterns: ['list todos', 'show todos', 'show my list'] },
+    { name: 'task.create', scope: 'MCP', patterns: ['create task *', 'new task *', 'task *'] },
+    { name: 'notify.team', scope: 'REMOTE', patterns: ['notify *', 'send notification *', 'alert *'] },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // DOM refs
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 
-const micBtn        = document.getElementById('micBtn');
-const statusEl      = document.getElementById('status');
-const transcriptEl  = document.getElementById('transcript');
-const logEl         = document.getElementById('log');
-const langSelect    = document.getElementById('langSelect');
+const micBtn = document.getElementById('micBtn');
+const statusEl = document.getElementById('status');
+const transcriptEl = document.getElementById('transcript');
+const logEl = document.getElementById('log');
+const loadStatusEl = document.getElementById('loadStatus');
+const langSelect = document.getElementById('langSelect');
 const continuousCheck = document.getElementById('continuousCheck');
-const fuzzySlider   = document.getElementById('fuzzySlider');
-const fuzzyValue    = document.getElementById('fuzzyValue');
-const mcpUrlInput   = document.getElementById('mcpUrl');
+const fuzzySlider = document.getElementById('fuzzySlider');
+const fuzzyValue = document.getElementById('fuzzyValue');
+const mcpUrlInput = document.getElementById('mcpUrl');
 const webhookUrlInput = document.getElementById('webhookUrl');
-const todoListEl    = document.getElementById('todoList');
+const todoListEl = document.getElementById('todoList');
 
-// ═══════════════════════════════════════════════════════════════════════
-// Logging helper
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// Load v8v-core library
+// ═══════════════════════════════════════════════════════════════════
+
+function tryLoadLibrary() {
+    try {
+        const mod = globalThis['io.github.alimomin1998:core'];
+
+        if (mod) {
+            const VoiceAgentJs = mod.io.v8v.core.VoiceAgentJs;
+
+            if (VoiceAgentJs) {
+                agent = new VoiceAgentJs(config.language);
+
+                // ── Register LOCAL intents ──
+                agent.registerPhrase('todo.add', 'en', 'add *');
+                agent.registerPhrase('todo.add', 'en', 'add * to todo');
+                agent.registerPhrase('todo.add', 'en', 'add * to my list');
+                agent.registerPhrase('todo.remove', 'en', 'remove *');
+                agent.registerPhrase('todo.remove', 'en', 'delete *');
+                agent.registerPhrase('todo.list', 'en', 'list todos');
+                agent.registerPhrase('todo.list', 'en', 'show todos');
+
+                // MCP + REMOTE intents are registered when URLs are configured
+                // (see updateMcpUrl and updateWebhookUrl below). They use the
+                // library's built-in Ktor-based McpClient / WebhookActionHandler.
+
+                // ── Callbacks ──
+                agent.onTranscript(text => {
+                    transcriptEl.textContent = text;
+                    addLog(`Transcript: "${text}"`, 'info');
+                });
+
+                // Register error callback BEFORE onIntent so action errors
+                // can be forwarded (onIntent forwards ActionResult.Error to onError).
+                agent.onError(msg => addLog(`Error: ${msg}`, 'error'));
+
+                agent.onIntent((intentName, message) => {
+                    const intent = intents.find(i => i.name === intentName);
+                    const scope = intent ? intent.scope : 'LOCAL';
+
+                    // LOCAL: todo management (message = extractedText from library)
+                    if (intentName === 'todo.add' && message) {
+                        todos.push(message);
+                        addLog(`[LOCAL] Added "${message}"`, 'intent');
+                        renderTodos();
+                    } else if (intentName === 'todo.remove' && message) {
+                        const idx = todos.findIndex(t =>
+                            t.toLowerCase().includes(message.toLowerCase()));
+                        if (idx >= 0) {
+                            const removed = todos.splice(idx, 1)[0];
+                            addLog(`[LOCAL] Removed "${removed}"`, 'intent');
+                            renderTodos();
+                        } else {
+                            addLog(`[LOCAL] "${message}" not found in list`, 'error');
+                        }
+                    } else if (intentName === 'todo.list') {
+                        addLog(todos.length
+                            ? `[LOCAL] Tasks: ${todos.join(', ')}`
+                            : '[LOCAL] Task list is empty', 'intent');
+
+                    // MCP: result comes from library's McpActionHandler (Ktor HTTP)
+                    } else if (scope === 'MCP') {
+                        addLog(`[MCP] ${message || 'OK'}`, 'intent');
+
+                    // REMOTE: result comes from library's WebhookActionHandler (Ktor HTTP)
+                    } else if (scope === 'REMOTE') {
+                        addLog(`[REMOTE] ${message || 'Delivered'}`, 'intent');
+
+                    } else {
+                        addLog(`[${scope}] ${intentName}: ${message}`, 'intent');
+                    }
+                });
+
+                agent.onUnhandled(text => addLog(`Unmatched: "${text}"`, 'error'));
+
+                usingLibrary = true;
+                loadStatusEl.textContent =
+                    'v8v-core loaded — using VoiceAgentJs with LOCAL + MCP + REMOTE (all via library)';
+                loadStatusEl.className = 'load-ok';
+                addLog('[LIB] VoiceAgentJs loaded (single package, full parity)', 'intent');
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn('Could not load v8v-core:', e);
+    }
+
+    // Fallback
+    usingLibrary = false;
+    loadStatusEl.textContent = 'v8v-core not found — using Web Speech API fallback';
+    loadStatusEl.className = 'load-fail';
+    addLog('[FALLBACK] Using Web Speech API + inline intent matching', 'error');
+}
+
+tryLoadLibrary();
+
+// ═══════════════════════════════════════════════════════════════════
+// Logging
+// ═══════════════════════════════════════════════════════════════════
 
 function addLog(text, className) {
     const line = document.createElement('div');
@@ -90,477 +165,249 @@ function addLog(text, className) {
     while (logEl.children.length > 30) logEl.removeChild(logEl.lastChild);
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Intent matching
-//
-// HOW FUZZY MATCHING WORKS:
-//
-// The resolver tries to match spoken text against registered patterns
-// in three passes:
-//
-// Pass 1 — Wildcard regex match:
-//   Each pattern like "add * to todo" is converted to a regex:
-//     ^add (.+) to todo$
-//   If the input "add milk to todo" matches, confidence = 1.0 and
-//   the captured group "milk" becomes the extractedText.
-//
-// Pass 2 — Dice similarity (fuzzy):
-//   When no exact match is found AND fuzzyThreshold > 0, we compute
-//   the Dice coefficient between the input words and pattern words:
-//
-//     Dice = (2 × |intersection|) / (|A| + |B|)
-//
-//   Example:
-//     Input:   "please add milk to my todo list"  → {please, add, milk, to, my, todo, list}  (7 words)
-//     Pattern: "add * to todo"                     → {add, to, todo}  (3 literal words, * removed)
-//     Intersection: {add, to, todo}                → 3 matches
-//     Dice = (2 × 3) / (7 + 3) = 6/10 = 0.60
-//
-//   If Dice >= fuzzyThreshold, it's a fuzzy match. The Dice formula
-//   penalizes extra filler words (unlike simple overlap), so:
-//     "add milk to todo"       → Dice = (2×3)/(4+3) = 0.86  (high — good match)
-//     "please could you add milk to my todo list" → 0.50  (low — lots of filler)
-//
-//   This is why the fuzzy threshold slider matters: at 0.5 you accept
-//   loose matches, at 0.8 you require close phrasing.
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// Mic toggle
+// ═══════════════════════════════════════════════════════════════════
+
+function toggleMic() {
+    listening ? stopListening() : startListening();
+}
+
+async function startListening() {
+    if (usingLibrary && agent) {
+        // Request mic permission once from JS (must be in user-gesture context).
+        if (!micPermissionGranted) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(t => t.stop());
+                micPermissionGranted = true;
+                addLog('Mic permission granted', 'info');
+            } catch (e) {
+                addLog(`getUserMedia: ${e.message} (proceeding with Speech API)`, 'info');
+                micPermissionGranted = true; // Don't ask again regardless
+            }
+        }
+        agent.start();
+        listening = true;
+        micBtn.classList.add('listening');
+        statusEl.textContent = 'Listening...';
+        statusEl.className = 'status-listening';
+        addLog('Recognition started (VoiceAgentJs)', 'info');
+        return;
+    }
+
+    // Fallback: Web Speech API
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        addLog('Speech recognition not supported', 'error');
+        statusEl.textContent = 'Not supported';
+        return;
+    }
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!recognition) {
+        recognition = new SR();
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.onresult = (e) => {
+            const text = e.results[e.results.length - 1][0].transcript.trim();
+            transcriptEl.textContent = text;
+            addLog(`Transcript: "${text}"`, 'info');
+            const m = matchIntent(text);
+            if (m) {
+                addLog(`Intent: ${m.intent} [${m.scope}] (${m.confidence.toFixed(2)})`, 'intent');
+                handleFallback(m);
+            } else {
+                addLog(`Unmatched: "${text}"`, 'error');
+            }
+        };
+        recognition.onerror = (e) => {
+            addLog(`Error: ${e.error}`, 'error');
+            if (e.error !== 'no-speech' && e.error !== 'aborted') stopListening();
+        };
+        recognition.onend = () => {
+            if (listening && config.continuous) recognition.start();
+            else stopListening();
+        };
+    }
+    recognition.lang = config.language;
+    recognition.continuous = config.continuous;
+    recognition.start();
+    listening = true;
+    micBtn.classList.add('listening');
+    statusEl.textContent = 'Listening...';
+    statusEl.className = 'status-listening';
+    addLog('Recognition started (fallback)', 'info');
+}
+
+function stopListening() {
+    if (usingLibrary && agent) agent.stop();
+    else if (recognition) { listening = false; recognition.stop(); }
+    listening = false;
+    micBtn.classList.remove('listening');
+    statusEl.textContent = 'Tap the mic to start';
+    statusEl.className = 'status-idle';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Fallback intent matching (only used when library not loaded)
+// ═══════════════════════════════════════════════════════════════════
 
 function matchIntent(text) {
-    const normalized = text.toLowerCase().trim();
-    let bestMatch = null;
-    let bestScore = 0;
-
+    const norm = text.toLowerCase().trim();
+    let best = null, bestScore = 0;
     for (const intent of intents) {
-        for (const pattern of intent.patterns) {
-            const score = matchPattern(normalized, pattern.toLowerCase());
+        for (const pat of intent.patterns) {
+            const score = matchPattern(norm, pat.toLowerCase());
             if (score > bestScore) {
                 bestScore = score;
-                bestMatch = {
-                    intent: intent.name,
-                    scope: intent.scope,
-                    rawText: text,
-                    extractedText: extractWildcard(normalized, pattern.toLowerCase()),
-                    confidence: score,
-                };
+                best = { intent: intent.name, scope: intent.scope, rawText: text,
+                    extractedText: extractWildcard(norm, pat.toLowerCase()), confidence: score };
             }
         }
     }
-
-    // For exact wildcard matches the score is high (>= 0.8).
-    // For fuzzy: only accept if above fuzzyThreshold.
-    const minScore = config.fuzzyThreshold > 0 ? config.fuzzyThreshold : 0.8;
-    if (bestMatch && bestMatch.confidence >= minScore) {
-        return bestMatch;
-    }
-    return null;
+    const min = config.fuzzyThreshold > 0 ? config.fuzzyThreshold : 0.8;
+    return best && best.confidence >= min ? best : null;
 }
 
 function matchPattern(text, pattern) {
     if (pattern.includes('*')) {
-        // Build regex from wildcard pattern:  "add * to todo" → /^add (.+) to todo$/
         const parts = pattern.split('*');
-        const regexStr = '^' + parts.map(p => escapeRegex(p.trim())).join('(.+)') + '$';
-        const regex = new RegExp(regexStr);
-        if (regex.test(text)) {
-            return 1.0; // exact wildcard match
-        }
-        // Fall through to fuzzy if threshold is set
-        if (config.fuzzyThreshold > 0) {
-            return diceSimilarity(text, pattern);
-        }
+        const re = new RegExp('^' + parts.map(p => escapeRe(p.trim())).join('(.+)') + '$');
+        if (re.test(text)) return 1.0;
+        if (config.fuzzyThreshold > 0) return dice(text, pattern);
         return 0;
-    } else {
-        return diceSimilarity(text, pattern);
     }
+    return dice(text, pattern);
 }
 
 function extractWildcard(text, pattern) {
     if (!pattern.includes('*')) return text;
     const parts = pattern.split('*').map(p => p.trim()).filter(Boolean);
-    let remaining = text;
-    for (const part of parts) {
-        remaining = remaining.replace(part, '').trim();
-    }
-    return remaining || text;
+    let r = text;
+    for (const p of parts) r = r.replace(p, '').trim();
+    return r || text;
 }
 
-/**
- * Dice similarity coefficient:
- *   Dice = (2 × |intersection|) / (|A| + |B|)
- *
- * Where A = input word tokens, B = pattern literal word tokens (wildcards removed).
- * Returns a value between 0.0 (no overlap) and 1.0 (identical word sets).
- */
-function diceSimilarity(a, b) {
-    const tokensA = new Set(a.split(/\s+/));
-    // Remove wildcards from pattern before tokenizing
-    const cleaned = b.replace(/\*/g, ' ').replace(/\{[^}]+\}/g, ' ');
-    const tokensB = new Set(cleaned.split(/\s+/).filter(Boolean));
-    if (tokensB.size === 0) return 0;
-    let intersection = 0;
-    for (const t of tokensA) if (tokensB.has(t)) intersection++;
-    return (2 * intersection) / (tokensA.size + tokensB.size);
+function dice(a, b) {
+    const ta = new Set(a.split(/\s+/));
+    const tb = new Set(b.replace(/\*/g, ' ').split(/\s+/).filter(Boolean));
+    if (tb.size === 0) return 0;
+    let inter = 0;
+    for (const t of ta) if (tb.has(t)) inter++;
+    return (2 * inter) / (ta.size + tb.size);
 }
 
-function escapeRegex(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Action handlers (LOCAL, MCP, REMOTE)
-// ═══════════════════════════════════════════════════════════════════════
-
-async function handleIntent(result) {
-    const badge = `[${result.scope}]`;
-
-    switch (result.scope) {
-        case 'LOCAL':
-            handleLocalAction(result);
-            break;
-
-        case 'MCP':
-            await handleMcpAction(result);
-            break;
-
-        case 'REMOTE':
-            await handleRemoteAction(result);
-            break;
-    }
-}
-
-// ---- LOCAL ----
-function handleLocalAction(result) {
-    switch (result.intent) {
-        case 'todo.add':
-            if (result.extractedText) {
-                todos.push(result.extractedText);
-                addLog(`[LOCAL] Added "${result.extractedText}" to todos`, 'intent');
-                renderTodos();
-            }
-            break;
-        case 'todo.remove':
-            if (result.extractedText) {
-                const idx = todos.findIndex(t =>
-                    t.toLowerCase().includes(result.extractedText.toLowerCase()));
-                if (idx >= 0) {
-                    const removed = todos.splice(idx, 1)[0];
-                    addLog(`[LOCAL] Removed "${removed}" from todos`, 'intent');
-                    renderTodos();
-                } else {
-                    addLog(`[LOCAL] "${result.extractedText}" not found`, 'error');
-                }
-            }
-            break;
-        case 'todo.list':
-            if (todos.length === 0) {
-                addLog('[LOCAL] Todo list is empty', 'intent');
-            } else {
-                addLog(`[LOCAL] Todos: ${todos.join(', ')}`, 'intent');
-            }
-            break;
-    }
-}
-
-// ---- MCP (JSON-RPC 2.0 over HTTP) ----
-async function handleMcpAction(result) {
-    const url = config.mcpServerUrl;
-    if (!url) {
-        addLog('[MCP] No MCP server URL configured — set it in Settings', 'error');
-        return;
-    }
-
-    try {
-        addLog(`[MCP] Calling tool "create_task" on ${url}...`, 'mcp');
-        const rpcRequest = {
-            jsonrpc: '2.0',
-            id: Date.now(),
-            method: 'tools/call',
-            params: {
-                name: 'create_task',
-                arguments: {
-                    text: result.extractedText,
-                    rawText: result.rawText,
-                },
-            },
-        };
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(rpcRequest),
-        });
-
-        if (!response.ok) {
-            addLog(`[MCP] HTTP ${response.status}: ${response.statusText}`, 'error');
-            return;
+// Fallback action handler (when library not loaded)
+async function handleFallback(r) {
+    if (r.scope === 'LOCAL') {
+        if (r.intent === 'todo.add' && r.extractedText) {
+            todos.push(r.extractedText); addLog(`[LOCAL] Added "${r.extractedText}"`, 'intent'); renderTodos();
+        } else if (r.intent === 'todo.remove' && r.extractedText) {
+            const i = todos.findIndex(t => t.toLowerCase().includes(r.extractedText.toLowerCase()));
+            if (i >= 0) { todos.splice(i, 1); addLog(`[LOCAL] Removed`, 'intent'); renderTodos(); }
+        } else if (r.intent === 'todo.list') {
+            addLog(todos.length ? `[LOCAL] Tasks: ${todos.join(', ')}` : '[LOCAL] Empty', 'intent');
         }
-
-        const json = await response.json();
-        if (json.error) {
-            addLog(`[MCP] Error: ${json.error.message}`, 'error');
-        } else {
-            const text = json.result?.content?.[0]?.text || 'OK';
-            addLog(`[MCP] Success: ${text}`, 'intent');
-        }
-    } catch (e) {
-        addLog(`[MCP] Call failed: ${e.message}`, 'error');
+    } else if (r.scope === 'MCP') {
+        let url = config.mcpServerUrl;
+        if (!url) { addLog('[MCP] No URL configured', 'error'); return; }
+        if (!url.startsWith('http')) url = 'http://' + url;
+        try {
+            const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call',
+                    params: { name: 'create_task', arguments: { text: r.extractedText } } }) });
+            const json = await resp.json();
+            addLog(`[MCP] ${json.result?.content?.[0]?.text || 'OK'}`, 'intent');
+        } catch (e) { addLog(`[MCP] Failed: ${e.message}`, 'error'); }
+    } else if (r.scope === 'REMOTE') {
+        let url = config.webhookUrl;
+        if (!url) { addLog('[REMOTE] No URL configured', 'error'); return; }
+        if (!url.startsWith('http')) url = 'http://' + url;
+        try {
+            const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ intent: r.intent, extractedText: r.extractedText, rawText: r.rawText }) });
+            const json = await resp.json();
+            addLog(`[REMOTE] ${json.message || 'Delivered'}`, 'intent');
+        } catch (e) { addLog(`[REMOTE] Failed: ${e.message}`, 'error'); }
     }
 }
 
-// ---- REMOTE (Webhook POST) ----
-async function handleRemoteAction(result) {
-    const url = config.webhookUrl;
-    if (!url) {
-        addLog('[REMOTE] No webhook URL configured — set it in Settings', 'error');
-        return;
-    }
-
-    try {
-        addLog(`[REMOTE] Sending webhook to ${url}...`, 'remote');
-        const payload = {
-            intent: result.intent,
-            extractedText: result.extractedText,
-            rawText: result.rawText,
-            language: config.language,
-            timestamp: new Date().toISOString(),
-        };
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            addLog(`[REMOTE] HTTP ${response.status}: ${response.statusText}`, 'error');
-            return;
-        }
-
-        const json = await response.json();
-        if (json.success === false) {
-            addLog(`[REMOTE] Error: ${json.message || 'Webhook returned failure'}`, 'error');
-        } else {
-            addLog(`[REMOTE] Success: ${json.message || 'Webhook delivered'}`, 'intent');
-        }
-    } catch (e) {
-        addLog(`[REMOTE] Call failed: ${e.message}`, 'error');
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // Todo list rendering
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 
 function renderTodos() {
-    if (!todoListEl) return;
     if (todos.length === 0) {
         todoListEl.innerHTML = '<div class="empty-state">Say "add project status update" to get started</div>';
         return;
     }
     todoListEl.innerHTML = todos.map((t, i) =>
         `<div class="todo-item">
-            <span>${t}</span>
-            <button class="todo-remove" onclick="removeTodo(${i})">x</button>
+            <span><span class="badge badge-local">LOCAL</span> ${t}</span>
+            <button class="todo-remove" onclick="removeTodo(${i})">✕</button>
         </div>`
     ).join('');
 }
 
-function removeTodo(index) {
-    const removed = todos.splice(index, 1)[0];
-    addLog(`[LOCAL] Removed "${removed}"`, 'intent');
-    renderTodos();
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Web Speech API — single-instance, permission requested once
-//
-// FIX: The previous version created a new SpeechRecognition instance on
-// every toggleMic() call. Each new instance triggered a browser permission
-// prompt. Now we:
-//   1. Request mic permission ONCE upfront via getUserMedia
-//   2. Create ONE SpeechRecognition instance and reuse it
-//   3. On stop, we call .stop() but keep the instance alive
-//   4. On language change, we recreate the instance (unavoidable)
-// ═══════════════════════════════════════════════════════════════════════
-
-async function ensureMicPermission() {
-    if (micPermissionGranted) return true;
-    try {
-        // Request permission once — the browser remembers the grant
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Immediately release the stream (we just needed the permission grant)
-        stream.getTracks().forEach(track => track.stop());
-        micPermissionGranted = true;
-        return true;
-    } catch (e) {
-        addLog(`Microphone permission denied: ${e.message}`, 'error');
-        setStatus('Microphone permission denied', 'error');
-        return false;
+function removeTodo(i) {
+    if (i >= 0 && i < todos.length) {
+        todos.splice(i, 1);
+        addLog(`[LOCAL] Task removed`, 'intent');
+        renderTodos();
     }
 }
 
-function createRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        setStatus('Web Speech API not supported in this browser', 'error');
-        addLog('ERROR: Web Speech API not supported. Use Chrome or Edge.', 'error');
-        return null;
-    }
-
-    const rec = new SpeechRecognition();
-    rec.lang = config.language;
-    rec.interimResults = true;
-    rec.continuous = config.continuous;
-
-    rec.onstart = () => {
-        listening = true;
-        micBtn.classList.add('listening');
-        setStatus('Listening...', 'listening');
-        addLog('Recognition started', 'transcript');
-    };
-
-    rec.onresult = (event) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            const result = event.results[i];
-            if (result.isFinal) {
-                finalTranscript += result[0].transcript;
-            } else {
-                interimTranscript += result[0].transcript;
-            }
-        }
-
-        if (interimTranscript) {
-            transcriptEl.textContent = interimTranscript;
-        }
-
-        if (finalTranscript) {
-            transcriptEl.textContent = finalTranscript;
-            addLog(`Transcript: "${finalTranscript}"`, 'transcript');
-
-            const match = matchIntent(finalTranscript);
-            if (match) {
-                addLog(`Intent: ${match.intent} [${match.scope}] (confidence: ${match.confidence.toFixed(2)})`, 'intent');
-                handleIntent(match);
-            } else {
-                addLog(`Unmatched: "${finalTranscript}"`, 'unhandled');
-            }
-        }
-    };
-
-    rec.onerror = (event) => {
-        // "no-speech" and "aborted" are non-fatal — don't show as errors
-        if (event.error === 'no-speech' || event.error === 'aborted') return;
-        addLog(`Error: ${event.error}`, 'error');
-        if (event.error === 'not-allowed') {
-            setStatus('Microphone permission denied', 'error');
-            micPermissionGranted = false;
-        }
-    };
-
-    rec.onend = () => {
-        listening = false;
-        micBtn.classList.remove('listening');
-
-        // Auto-restart in continuous mode (reuse same instance)
-        if (config.continuous && recognition === rec) {
-            setStatus('Restarting...', 'listening');
-            setTimeout(() => {
-                try {
-                    rec.start();
-                } catch (_) {
-                    setStatus('Tap the mic to start', 'idle');
-                }
-            }, 200);
-        } else {
-            setStatus('Tap the mic to start', 'idle');
-        }
-    };
-
-    return rec;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// UI functions
-// ═══════════════════════════════════════════════════════════════════════
-
-function setStatus(text, type) {
-    statusEl.textContent = text;
-    statusEl.className = `mic-label status-${type || 'idle'}`;
-}
-
-async function toggleMic() {
-    if (listening) {
-        // Stop: keep the instance but stop recognition
-        if (recognition) {
-            config.continuous = false;       // prevent auto-restart in onend
-            continuousCheck.checked = false;
-            recognition.stop();
-        }
-        recognition = null;
-        return;
-    }
-
-    // Ensure permission is granted ONCE before creating recognition
-    const granted = await ensureMicPermission();
-    if (!granted) return;
-
-    // Create a fresh instance (or reuse language-matched one)
-    recognition = createRecognition();
-    if (recognition) {
-        try {
-            recognition.start();
-        } catch (e) {
-            addLog(`Start error: ${e.message}`, 'error');
-        }
-    }
-}
+// ═══════════════════════════════════════════════════════════════════
+// Settings handlers
+// ═══════════════════════════════════════════════════════════════════
 
 function updateLang() {
     config.language = langSelect.value;
-    addLog(`Language set to: ${config.language}`, 'transcript');
-    // Must recreate recognition for language change
-    if (listening && recognition) {
-        recognition.stop();
-        recognition = null;
-        setTimeout(() => toggleMic(), 300);
-    }
+    if (usingLibrary && agent) agent.updateLanguage(config.language);
+    addLog(`Language → ${config.language}`, 'info');
 }
 
 function updateContinuous() {
     config.continuous = continuousCheck.checked;
-    addLog(`Continuous mode: ${config.continuous}`, 'transcript');
-    if (recognition) {
-        recognition.continuous = config.continuous;
-    }
+    if (usingLibrary && agent) agent.setContinuous(config.continuous);
+    addLog(`Continuous → ${config.continuous}`, 'info');
 }
 
 function updateFuzzy() {
     config.fuzzyThreshold = parseFloat(fuzzySlider.value);
     fuzzyValue.textContent = config.fuzzyThreshold.toFixed(1);
-    addLog(`Fuzzy threshold: ${config.fuzzyThreshold}`, 'transcript');
+    if (usingLibrary && agent) agent.setFuzzyThreshold(config.fuzzyThreshold);
 }
 
 function updateMcpUrl() {
-    config.mcpServerUrl = mcpUrlInput.value.trim();
-    if (config.mcpServerUrl) {
-        addLog(`[MCP] Server URL set: ${config.mcpServerUrl}`, 'mcp');
+    config.mcpServerUrl = mcpUrlInput.value;
+    if (config.mcpServerUrl && usingLibrary && agent) {
+        let url = config.mcpServerUrl;
+        if (!url.startsWith('http')) url = 'http://' + url;
+        // Register MCP action with the library's built-in Ktor-based McpClient.
+        // This replaces any previously registered handler for 'task.create'.
+        agent.registerMcpAction(
+            'task.create', 'en',
+            ['create task *', 'new task *', 'task *'],
+            url, 'create_task'
+        );
+        addLog(`[MCP] Registered via library McpClient → ${url}`, 'info');
     }
 }
 
 function updateWebhookUrl() {
-    config.webhookUrl = webhookUrlInput.value.trim();
-    if (config.webhookUrl) {
-        addLog(`[REMOTE] Webhook URL set: ${config.webhookUrl}`, 'remote');
+    config.webhookUrl = webhookUrlInput.value;
+    if (config.webhookUrl && usingLibrary && agent) {
+        let url = config.webhookUrl;
+        if (!url.startsWith('http')) url = 'http://' + url;
+        // Register webhook action with the library's built-in Ktor-based WebhookActionHandler.
+        agent.registerWebhookAction(
+            'notify.team', 'en',
+            ['notify *', 'send notification *', 'alert *'],
+            url
+        );
+        addLog(`[REMOTE] Registered via library WebhookActionHandler → ${url}`, 'info');
     }
 }
-
-// ═══════════════════════════════════════════════════════════════════════
-// Init
-// ═══════════════════════════════════════════════════════════════════════
-
-renderTodos();
-addLog('V8V Web Demo loaded. Click the mic to start.', 'transcript');
-addLog('Supports LOCAL, MCP, and REMOTE scopes.', 'transcript');

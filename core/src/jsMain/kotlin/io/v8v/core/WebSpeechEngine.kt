@@ -45,18 +45,14 @@ class WebSpeechEngine : SpeechRecognitionEngine {
     override val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
 
     private var recognition: dynamic = null
+    private var currentLanguage: String = "en"
 
-    override fun startListening(language: String) {
-        try {
-            recognition = createSpeechRecognition()
-        } catch (e: Exception) {
-            _events.tryEmit(SpeechEvent.Error(code = -1, message = e.message ?: "SpeechRecognition not available"))
-            return
-        }
+    private fun ensureRecognition() {
+        if (recognition != null) return
 
+        recognition = createSpeechRecognition()
         val rec = recognition!!
 
-        rec.lang = language
         rec.continuous = true
         rec.interimResults = true
         rec.maxAlternatives = 1
@@ -86,7 +82,6 @@ class WebSpeechEngine : SpeechRecognitionEngine {
 
         rec.onerror = { event: dynamic ->
             val errorType = event.error as String
-            // "no-speech" and "aborted" are non-fatal in continuous mode
             if (errorType != "no-speech" && errorType != "aborted") {
                 _events.tryEmit(SpeechEvent.Error(code = 0, message = "Web Speech error: $errorType"))
             }
@@ -94,15 +89,20 @@ class WebSpeechEngine : SpeechRecognitionEngine {
 
         rec.onend = {
             _isListening.value = false
-            // In continuous mode, browsers may stop; restart automatically
-            if (rec.continuous as Boolean) {
-                try {
-                    rec.start()
-                } catch (_: dynamic) {
-                    // Already started or destroyed — ignore
-                }
-            }
         }
+    }
+
+    override fun startListening(language: String) {
+        try {
+            ensureRecognition()
+        } catch (e: Exception) {
+            _events.tryEmit(SpeechEvent.Error(code = -1, message = e.message ?: "SpeechRecognition not available"))
+            return
+        }
+
+        val rec = recognition!!
+        currentLanguage = language
+        rec.lang = language
 
         try {
             rec.start()
@@ -113,8 +113,6 @@ class WebSpeechEngine : SpeechRecognitionEngine {
 
     override fun stopListening() {
         try {
-            // Set continuous to false so onend doesn't auto-restart
-            recognition?.continuous = false
             recognition?.stop()
         } catch (_: dynamic) {
             // Ignore errors on stop

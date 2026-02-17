@@ -1,0 +1,13 @@
+{
+  "name": "v8v-example-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "V8V Example — Web app with LOCAL + MCP + REMOTE voice actions",
+  "scripts": {
+    "build": "cd .. && ./gradlew :core:jsBrowserProductionLibraryDistribution",
+    "start": "npx serve -l 5174"
+  },
+  "dependencies": {
+    "v8v-core": "0.3.0"
+  }
+}

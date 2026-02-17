@@ -3,6 +3,8 @@ package io.v8v.core
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class AndroidSpeechEngine(
     private val context: Context,
 ) : SpeechRecognitionEngine {
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val recognizer: SpeechRecognizer =
         SpeechRecognizer.createSpeechRecognizer(context)
 
@@ -39,25 +42,25 @@ class AndroidSpeechEngine(
     private var currentLanguage: String = "en"
 
     init {
-        recognizer.setRecognitionListener(createListener())
+        mainHandler.post { recognizer.setRecognitionListener(createListener()) }
     }
 
     override fun startListening(language: String) {
         currentLanguage = language
         Log.d(TAG, "startListening(language=$language)")
         val intent = createRecognizerIntent(language)
-        recognizer.startListening(intent)
+        mainHandler.post { recognizer.startListening(intent) }
     }
 
     override fun stopListening() {
         Log.d(TAG, "stopListening()")
-        recognizer.stopListening()
+        mainHandler.post { recognizer.stopListening() }
         _isListening.value = false
     }
 
     override fun destroy() {
         Log.d(TAG, "destroy()")
-        recognizer.destroy()
+        mainHandler.post { recognizer.destroy() }
         _isListening.value = false
     }
 

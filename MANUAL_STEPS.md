@@ -3,6 +3,10 @@
 Everything below is in exact order. Do Step 1 first, then Step 2, etc.
 Each step tells you exactly what to type, what to click, and what to copy.
 
+> **Architecture note (v0.3.0+):** V8V ships as a **single package** on every platform.
+> The old `connector-mcp` and `connector-remote` modules were merged into `core`.
+> There is only one Maven artifact, one npm package, and one XCFramework.
+
 ---
 
 ## STEP 1: Create GitHub Repository and Push Code
@@ -32,7 +36,7 @@ git init
 
 git add -A
 
-git commit -m "Initial commit: V8V v0.1.0"
+git commit -m "Initial commit: V8V v0.3.0"
 
 git branch -M main
 
@@ -86,7 +90,7 @@ This lets Android/Kotlin/JVM developers install your library with Gradle.
 
 1. After logging in, go to https://central.sonatype.com/publishing/namespaces
 2. Click **Add Namespace**
-3. Enter namespace: `io.v8v`
+3. Enter namespace: `io.github.alimomin1998`
 4. It will ask you to verify ownership. Choose **GitHub verification**:
    - It will ask you to create a specific repo in your GitHub account to prove ownership
    - Follow the exact instructions shown (usually: create a temporary repo with a specific name)
@@ -155,13 +159,17 @@ Replace `ABC12345` with YOUR key ID:
 gpg --keyserver keyserver.ubuntu.com --send-keys ABC12345
 ```
 
-### 3.5 Export secret key ring
+### 3.5 Export private key for Gradle/CI
 
 Replace `ABC12345` with YOUR key ID:
 
 ```bash
-gpg --export-secret-keys ABC12345 > ~/.gnupg/secring.gpg
+gpg --armor --export-secret-keys ABC12345
 ```
+
+Copy the full output (including BEGIN/END lines). You will use it as:
+- `signingInMemoryKey` in local `~/.gradle/gradle.properties`
+- `GPG_SIGNING_KEY` in GitHub Secrets
 
 **Done. Your GPG key is ready.**
 
@@ -195,19 +203,21 @@ open -e ~/.gradle/gradle.properties
 Replace every placeholder with your actual values:
 
 ```properties
-sonatype.username=YOUR_SONATYPE_TOKEN_USERNAME
-sonatype.password=YOUR_SONATYPE_TOKEN_PASSWORD
-signing.keyId=ABC12345
-signing.password=YOUR_GPG_PASSPHRASE
-signing.secretKeyRingFile=/Users/ali/.gnupg/secring.gpg
+mavenCentralUsername=YOUR_SONATYPE_TOKEN_USERNAME
+mavenCentralPassword=YOUR_SONATYPE_TOKEN_PASSWORD
+signingInMemoryKeyId=ABC12345
+signingInMemoryKey=-----BEGIN PGP PRIVATE KEY BLOCK-----\n...\n-----END PGP PRIVATE KEY BLOCK-----
+signingInMemoryKeyPassword=YOUR_GPG_PASSPHRASE
 ```
 
 Where:
-- `sonatype.username` = the Token Username from Step 2.2
-- `sonatype.password` = the Token Password from Step 2.2
-- `signing.keyId` = the 8-char key ID from Step 3.3
-- `signing.password` = the passphrase you typed in Step 3.2
-- `signing.secretKeyRingFile` = `/Users/ali/.gnupg/secring.gpg`
+- `mavenCentralUsername` = the Token Username from Step 2.2
+- `mavenCentralPassword` = the Token Password from Step 2.2
+- `signingInMemoryKeyId` = the 8-char key ID from Step 3.3
+- `signingInMemoryKey` = your full ASCII-armored private key from Step 3.5
+- `signingInMemoryKeyPassword` = the passphrase you typed in Step 3.2
+
+Important: `gradle.properties` values are single-line. Use `\n` for line breaks in `signingInMemoryKey`, or pass this value via environment variables during publish.
 
 Save and close the file.
 
@@ -256,7 +266,7 @@ cd "/Users/ali/V8V voice agent"
 ### 6.1 Run tests
 
 ```bash
-./gradlew :core:jvmTest :connector-mcp:jvmTest :connector-remote:jvmTest
+./gradlew :core:jvmTest
 ```
 
 Wait for `BUILD SUCCESSFUL`. If any test fails, fix it before proceeding.
@@ -289,7 +299,7 @@ Wait for `BUILD SUCCESSFUL`.
 
 ---
 
-## STEP 7: First Release
+## STEP 7: Release
 
 Now do the actual release. This publishes to Maven Central, npm, and GitHub.
 
@@ -298,11 +308,11 @@ Now do the actual release. This publishes to Maven Central, npm, and GitHub.
 ```bash
 cd "/Users/ali/V8V voice agent"
 
-./scripts/release.sh 0.1.0
+./scripts/release.sh 0.3.0
 ```
 
 The script will:
-- Bump version to 0.1.0
+- Bump version to 0.3.0
 - Run tests
 - Publish to Maven Central (if credentials are set)
 - Build JS distribution
@@ -317,9 +327,9 @@ After the script finishes, run:
 ```bash
 git add -A
 
-git commit -m "Release v0.1.0"
+git commit -m "Release v0.3.0"
 
-git tag v0.1.0
+git tag v0.3.0
 
 git push origin main --tags
 ```
@@ -327,9 +337,9 @@ git push origin main --tags
 ### 7.3 Create GitHub Release (for XCFramework / SPM)
 
 ```bash
-gh release create v0.1.0 \
-  --title "v0.1.0" \
-  --notes "First release of V8V framework" \
+gh release create v0.3.0 \
+  --title "v0.3.0" \
+  --notes "Single package release — core includes MCP + webhook support" \
   V8VCore.xcframework.zip
 ```
 
@@ -340,33 +350,14 @@ This uploads the XCFramework zip to GitHub so iOS/macOS developers can download 
 The release script printed a checksum. It looks like a long string:
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
 
-Open `Package.swift` in the project root. Find this section:
-
-```swift
-// .binaryTarget(
-//     name: "V8VCore",
-//     url: "https://github.com/alimomin1998/v8v/releases/download/v0.1.0/V8VCore.xcframework.zip",
-//     checksum: "CHECKSUM_FROM_RELEASE_SCRIPT"
-// ),
-```
-
-Change it to (uncomment and fill in your checksum):
+Open `Package.swift` in the project root. Find the binaryTarget section and update:
 
 ```swift
 .binaryTarget(
     name: "V8VCore",
-    url: "https://github.com/alimomin1998/v8v/releases/download/v0.1.0/V8VCore.xcframework.zip",
+    url: "https://github.com/alimomin1998/v8v/releases/download/v0.3.0/V8VCore.xcframework.zip",
     checksum: "PASTE_YOUR_ACTUAL_CHECKSUM_HERE"
 ),
-```
-
-And comment out the local path block below it:
-
-```swift
-// .binaryTarget(
-//     name: "V8VCore",
-//     path: "core/build/XCFrameworks/release/V8VCore.xcframework"
-// ),
 ```
 
 Then push:
@@ -377,18 +368,12 @@ git commit -m "Update Package.swift with release checksum"
 git push origin main
 ```
 
-### 7.5 Release Maven Central staging (if using Sonatype OSSRH)
+### 7.5 Maven Central release behavior
 
-If you used the classic Sonatype OSSRH portal:
-1. Go to https://s01.oss.sonatype.org
-2. Login with your Sonatype credentials
-3. Click **Staging Repositories** (left sidebar)
-4. Find your repository (it has your group name `iovoiceagent-XXXX`)
-5. Select it, click **Close** (top bar)
-6. Wait for validation checks to pass (takes ~2 minutes)
-7. Click **Release**
+This project uses Central Portal publishing. `publishAndReleaseToMavenCentral` uploads and releases automatically after validation.
 
-If you used the new Central Portal (central.sonatype.com), publishing may be automatic.
+You can monitor deployments at:
+https://central.sonatype.com/publishing/deployments
 
 ---
 
@@ -396,12 +381,12 @@ If you used the new Central Portal (central.sonatype.com), publishing may be aut
 
 ### Maven Central
 
-Open: https://central.sonatype.com/search?q=io.v8v
+Open: https://central.sonatype.com/search?q=io.github.alimomin1998
 
 You should see:
-- `io.v8v:core`
-- `io.v8v:connector-mcp`
-- `io.v8v:connector-remote`
+- `io.github.alimomin1998:core`
+
+This single artifact contains LOCAL + MCP + REMOTE support.
 
 Note: Maven Central indexing can take 15-30 minutes after release.
 
@@ -409,14 +394,14 @@ Note: Maven Central indexing can take 15-30 minutes after release.
 
 Open: https://www.npmjs.com/package/v8v-core
 
-You should see version 0.1.0 published.
+You should see the latest version published.
 
 ### Swift Package Manager
 
 1. Open Xcode
 2. File → Add Package Dependencies
 3. Paste: `https://github.com/alimomin1998/v8v`
-4. It should find the package and show version 0.1.0
+4. It should find the package and show the latest version
 
 ---
 
@@ -434,8 +419,9 @@ This allows GitHub Actions to auto-run tests on every push.
 | Secret 1 | `SONATYPE_USERNAME` | Your Sonatype Token Username from Step 2.2 |
 | Secret 2 | `SONATYPE_PASSWORD` | Your Sonatype Token Password from Step 2.2 |
 | Secret 3 | `GPG_KEY_ID` | Your 8-char key ID from Step 3.3 |
-| Secret 4 | `GPG_PASSPHRASE` | Your GPG passphrase from Step 3.2 |
-| Secret 5 | `NPM_TOKEN` | Get from https://www.npmjs.com → click avatar → Access Tokens → Generate New Token → Classic Token → Automation → Generate → copy the token |
+| Secret 4 | `GPG_SIGNING_KEY` | Full ASCII-armored private key from Step 3.5 |
+| Secret 5 | `GPG_PASSPHRASE` | Your GPG passphrase from Step 3.2 |
+| Secret 6 | `NPM_TOKEN` | npm granular access token with publish permission |
 
 After adding these, the CI workflow at `.github/workflows/ci.yml` will run
 automatically on every push to `main` and on every pull request.
@@ -450,17 +436,17 @@ After the one-time setup above, every future release is just:
 cd "/Users/ali/V8V voice agent"
 
 # Pick your new version number
-./scripts/release.sh 0.2.0
+./scripts/release.sh 0.4.0
 
 # Then commit, tag, push
 git add -A
-git commit -m "Release v0.2.0"
-git tag v0.2.0
+git commit -m "Release v0.4.0"
+git tag v0.4.0
 git push origin main --tags
 
 # Create GitHub release
-gh release create v0.2.0 \
-  --title "v0.2.0" \
+gh release create v0.4.0 \
+  --title "v0.4.0" \
   --notes "What changed in this version" \
   V8VCore.xcframework.zip
 
@@ -476,6 +462,6 @@ That's it. ~5 minutes per release.
 
 | What | Where It's Published | How Developers Install |
 |------|---------------------|----------------------|
-| `core`, `connector-mcp`, `connector-remote` | Maven Central | `implementation("io.v8v:core-android:0.1.0")` |
+| `core` (all features) | Maven Central | `implementation("io.github.alimomin1998:core-android:0.3.0")` |
 | JS/TS library | npm | `npm install v8v-core` |
 | XCFramework | GitHub Release | Xcode → Add Package → paste repo URL |

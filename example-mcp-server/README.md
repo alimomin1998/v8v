@@ -43,16 +43,14 @@ Then open **http://localhost:3001** in your browser — you'll see the dashboard
 3. Click the mic and say **"create task buy groceries"**
 4. Switch to the App B tab — you'll see the task appear!
 
-**Option B — JVM CLI:**
-```bash
-./gradlew :example-jvm:run
-```
-Then type: `create task buy groceries`
-
-**Option C — Android:**
+**Option B — Android:**
 1. The Android example uses the embedded mock server by default
-2. To use this server instead, change `MCP_PORT` in `MainViewModel.kt`
+2. To use this server instead, change the MCP URL in the app settings
 3. Ensure `network_security_config.xml` allows cleartext to your IP
+
+**Option C — iOS / macOS:**
+1. Run the example-ios or example-macos app
+2. Set the MCP URL to `http://localhost:3001/mcp` in the app
 
 ### Step 3: Watch the cross-app magic
 

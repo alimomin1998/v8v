@@ -32,7 +32,7 @@ echo "  ✓ build.gradle.kts version set to ${VERSION}"
 # ───────────────────────────────────────────────────
 echo ""
 echo "▸ Step 2: Running tests..."
-./gradlew :core:jvmTest :connector-mcp:jvmTest :connector-remote:jvmTest
+./gradlew :core:jvmTest
 echo "  ✓ All JVM tests passed"
 
 # ───────────────────────────────────────────────────
@@ -48,15 +48,22 @@ echo "  ✓ Maven Local publish succeeded"
 # ───────────────────────────────────────────────────
 echo ""
 echo "▸ Step 4: Publishing to Maven Central..."
-echo "  Requires SONATYPE_USERNAME and SONATYPE_PASSWORD env vars."
-echo "  Requires GPG signing key in gradle.properties."
+# Credentials are read from ~/.gradle/gradle.properties automatically
+# (mavenCentralUsername, mavenCentralPassword, signingInMemoryKey*, etc.)
+# Env vars override if set (for CI).
 if [ -n "${SONATYPE_USERNAME:-}" ]; then
-    ./gradlew publishAllPublicationsToMavenCentralRepository
-    echo "  ✓ Maven Central publish succeeded"
+    echo "  Using environment variables for credentials (CI mode)."
+    ORG_GRADLE_PROJECT_mavenCentralUsername="${SONATYPE_USERNAME}" \
+    ORG_GRADLE_PROJECT_mavenCentralPassword="${SONATYPE_PASSWORD}" \
+    ORG_GRADLE_PROJECT_signingInMemoryKeyId="${GPG_KEY_ID}" \
+    ORG_GRADLE_PROJECT_signingInMemoryKey="${GPG_SIGNING_KEY}" \
+    ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="${GPG_PASSPHRASE}" \
+    ./gradlew publishAndReleaseToMavenCentral
 else
-    echo "  ⚠ SONATYPE_USERNAME not set — skipping Maven Central publish."
-    echo "    Run manually: ./gradlew publishAllPublicationsToMavenCentralRepository"
+    echo "  Using credentials from ~/.gradle/gradle.properties."
+    ./gradlew publishAndReleaseToMavenCentral
 fi
+echo "  ✓ Maven Central publish succeeded"
 
 # ───────────────────────────────────────────────────
 # Step 5: Build JS/TS distribution
@@ -78,14 +85,22 @@ cp npm/package.json "${NPM_DIR}/package.json"
 sed -i.bak "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" "${NPM_DIR}/package.json"
 rm -f "${NPM_DIR}/package.json.bak"
 
-if command -v npm &> /dev/null && npm whoami &> /dev/null 2>&1; then
+if [ -n "${NPM_TOKEN:-}" ]; then
+    echo "  Using NPM_TOKEN for publish authentication."
+    cd "${NPM_DIR}"
+    NODE_AUTH_TOKEN="${NPM_TOKEN}" npm publish --access public
+    cd - > /dev/null
+    echo "  ✓ npm package published"
+elif command -v npm &> /dev/null && npm whoami &> /dev/null 2>&1; then
+    echo "  Using npm login session for publish authentication."
     cd "${NPM_DIR}"
     npm publish --access public
     cd - > /dev/null
     echo "  ✓ npm package published"
 else
-    echo "  ⚠ Not logged in to npm — skipping npm publish."
-    echo "    Run manually: cd ${NPM_DIR} && npm publish --access public"
+    echo "  ⚠ npm auth not available — skipping npm publish."
+    echo "    Set NPM_TOKEN or run: npm login"
+    echo "    Then run manually: cd ${NPM_DIR} && npm publish --access public"
 fi
 
 # ───────────────────────────────────────────────────

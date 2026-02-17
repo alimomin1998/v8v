@@ -40,12 +40,6 @@ jobs:
       - name: Core — JVM tests
         run: ./gradlew :core:jvmTest
 
-      - name: Connector MCP — JVM tests
-        run: ./gradlew :connector-mcp:jvmTest
-
-      - name: Connector Remote — JVM tests
-        run: ./gradlew :connector-remote:jvmTest
-
       - name: JS browser tests
         run: ./gradlew -Pkotlin.js.nodejs.download=false :core:jsBrowserTest
 

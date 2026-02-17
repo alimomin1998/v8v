@@ -3,7 +3,8 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
-    `maven-publish`
+    alias(libs.plugins.kotlin.serialization)
+    id("com.vanniktech.maven.publish")
 }
 
 kotlin {
@@ -65,18 +66,34 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.json)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.client.mock)
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.ktor.client.okhttp)
+        }
+        val jsMain by getting {
+            dependencies {
+                implementation(libs.ktor.client.js)
+            }
         }
 
         // With applyDefaultHierarchyTemplate=true, appleMain/iosMain/macosMain
         // are created automatically by the Kotlin plugin with proper platform
         // library support. No manual source set wiring needed.
+        val appleMain by getting {
+            dependencies {
+                implementation(libs.ktor.client.darwin)
+            }
+        }
     }
 }
 
@@ -117,4 +134,29 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+}
+
+mavenPublishing {
+    pom {
+        name.set("V8V - ${project.name}")
+        description.set("Cross-platform voice orchestration framework with native on-device STT")
+        url.set("https://github.com/alimomin1998/v8v")
+        licenses {
+            license {
+                name.set("Apache License, Version 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0")
+            }
+        }
+        developers {
+            developer {
+                id.set("alimomin")
+                name.set("Ali Momin")
+            }
+        }
+        scm {
+            url.set("https://github.com/alimomin1998/v8v")
+            connection.set("scm:git:git://github.com/alimomin1998/v8v.git")
+            developerConnection.set("scm:git:ssh://git@github.com/alimomin1998/v8v.git")
+        }
+    }
 }

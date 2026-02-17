@@ -202,7 +202,7 @@ class VoiceAgent(
                 // Check (and request if needed) permission when a helper is available.
                 if (permissionHelper != null) {
                     var status = permissionHelper.checkMicrophonePermission()
-                    if (status == PermissionStatus.NOT_DETERMINED) {
+                    if (status != PermissionStatus.GRANTED) {
                         status = permissionHelper.requestMicrophonePermission()
                     }
                     if (status != PermissionStatus.GRANTED) {

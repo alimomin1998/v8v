@@ -11,9 +11,16 @@ package io.v8v.mcp
 data class McpServerConfig(
     val name: String,
     val host: String = "127.0.0.1",
-    val port: Int,
+    val port: Int = 0,
     val path: String = "/mcp",
+    private val baseUrl: String? = null,
 ) {
     /** Full base URL for the MCP endpoint. */
-    val url: String get() = "http://$host:$port$path"
+    val url: String get() = baseUrl ?: "http://$host:$port$path"
+
+    companion object {
+        /** Create a config from a full URL (e.g. "http://localhost:3001/mcp"). */
+        fun fromUrl(name: String, url: String): McpServerConfig =
+            McpServerConfig(name = name, baseUrl = url)
+    }
 }

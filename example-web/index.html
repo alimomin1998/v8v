@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V8V - Web Demo</title>
+    <title>V8V Example — Web</title>
     <style>
         :root {
             --bg: #0f0f0f;
@@ -19,50 +19,31 @@
             --text-muted: #8888a0;
             --border: #2a2a4a;
         }
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 2rem 1rem;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; display: flex; flex-direction: column;
+            align-items: center; padding: 2rem 1rem;
         }
-
         h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.25rem; }
-        .subtitle { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem; }
-
-        .container {
-            width: 100%;
-            max-width: 600px;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
+        .subtitle { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .lib-badge {
+            background: var(--surface2); border: 1px solid var(--primary);
+            border-radius: 8px; padding: 0.5rem 1rem; margin-bottom: 1.5rem;
+            font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.82rem;
+            color: var(--primary-light); text-align: center;
         }
-
+        .container { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 1rem; }
         .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.25rem;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1.25rem;
         }
-
         .card-title {
-            font-size: 0.85rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            margin-bottom: 0.75rem;
+            font-size: 0.85rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.75rem;
         }
-
-        /* Mic button */
         .mic-wrapper { display: flex; justify-content: center; padding: 1rem 0; }
-
         .mic-btn {
             width: 72px; height: 72px; border-radius: 50%; border: none;
             background: var(--primary); color: white; font-size: 1.6rem;
@@ -70,65 +51,41 @@
         }
         .mic-btn:hover { transform: scale(1.05); box-shadow: 0 0 24px rgba(108,99,255,0.4); }
         .mic-btn.listening { background: var(--error); animation: pulse 1.5s ease-in-out infinite; }
-
         @keyframes pulse {
             0%, 100% { box-shadow: 0 0 0 0 rgba(231,76,60,0.4); }
             50% { box-shadow: 0 0 0 16px rgba(231,76,60,0); }
         }
-
         .mic-label { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; }
-
         #status { text-align: center; font-weight: 600; font-size: 1rem; padding: 0.5rem; }
         .status-idle { color: var(--text-muted); }
         .status-listening { color: var(--primary-light); }
-        .status-error { color: var(--error); }
-
         #transcript { font-style: italic; color: var(--text-muted); min-height: 1.5em; }
-
-        /* Log */
         #log {
             font-family: 'SF Mono', 'Fira Code', monospace;
             font-size: 0.78rem; line-height: 1.6;
-            max-height: 220px; overflow-y: auto;
-            color: var(--text-muted);
+            max-height: 220px; overflow-y: auto; color: var(--text-muted);
         }
         #log .intent { color: var(--success); }
         #log .error { color: var(--error); }
-        #log .unhandled { color: #f39c12; }
-        #log .transcript { color: var(--primary-light); }
         #log .mcp { color: var(--mcp); }
-        #log .remote { color: var(--remote); }
-
-        /* Settings */
+        #log .info { color: var(--primary-light); }
         .setting-row {
             display: flex; align-items: center; justify-content: space-between;
             padding: 0.4rem 0; gap: 0.5rem;
         }
         .setting-row label { font-size: 0.85rem; white-space: nowrap; }
-
         select, input[type="range"] {
             background: var(--surface2); border: 1px solid var(--border);
-            color: var(--text); padding: 0.3rem 0.5rem;
-            border-radius: 6px; font-size: 0.85rem;
+            color: var(--text); padding: 0.3rem 0.5rem; border-radius: 6px; font-size: 0.85rem;
         }
-
-        input[type="text"], input[type="url"] {
+        input[type="url"] {
             background: var(--surface2); border: 1px solid var(--border);
-            color: var(--text); padding: 0.4rem 0.6rem;
-            border-radius: 6px; font-size: 0.82rem;
-            flex: 1; min-width: 0;
+            color: var(--text); padding: 0.4rem 0.6rem; border-radius: 6px;
+            font-size: 0.82rem; flex: 1; min-width: 0;
             font-family: 'SF Mono', 'Fira Code', monospace;
         }
-        input[type="text"]::placeholder, input[type="url"]::placeholder {
-            color: var(--text-muted); opacity: 0.6;
-        }
-        input[type="text"]:focus, input[type="url"]:focus {
-            outline: none; border-color: var(--primary);
-        }
-
-        /* Commands */
-        .command { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; font-size: 0.85rem; }
-
+        input[type="url"]::placeholder { color: var(--text-muted); opacity: 0.6; }
+        input[type="url"]:focus { outline: none; border-color: var(--primary); }
         .badge {
             font-size: 0.65rem; font-weight: 700; padding: 2px 6px;
             border-radius: 4px; text-transform: uppercase; white-space: nowrap;
@@ -136,10 +93,8 @@
         .badge-local { background: rgba(108,99,255,0.2); color: var(--primary-light); }
         .badge-mcp { background: rgba(230,126,34,0.2); color: var(--mcp); }
         .badge-remote { background: rgba(52,152,219,0.2); color: var(--remote); }
-
+        .command { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; font-size: 0.85rem; }
         .command-phrase { font-style: italic; color: var(--text-muted); }
-
-        /* Todo list */
         .todo-item {
             display: flex; align-items: center; justify-content: space-between;
             padding: 0.35rem 0; border-bottom: 1px solid var(--border);
@@ -152,25 +107,24 @@
         }
         .todo-remove:hover { background: rgba(231,76,60,0.15); }
         .empty-state { color: var(--text-muted); font-style: italic; font-size: 0.85rem; }
-
-        /* Fuzzy explainer */
-        .fuzzy-explainer {
-            margin-top: 0.5rem; padding: 0.75rem;
-            background: var(--surface2); border-radius: 8px;
-            font-size: 0.78rem; line-height: 1.5; color: var(--text-muted);
-        }
-        .fuzzy-explainer code {
-            background: rgba(108,99,255,0.15); padding: 1px 4px; border-radius: 3px;
-            font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem;
-        }
+        #loadStatus { text-align: center; padding: 0.5rem; font-size: 0.85rem; }
+        .load-ok { color: var(--success); }
+        .load-fail { color: var(--error); }
     </style>
 </head>
 <body>
-    <h1>V8V</h1>
-    <p class="subtitle">Cross-platform voice framework - Web Demo (LOCAL + MCP + REMOTE)</p>
+    <h1>V8V Example</h1>
+    <p class="subtitle">Web — voice agent with LOCAL, MCP & REMOTE actions</p>
+    <div class="lib-badge">v8v-core@0.3.0 from npm — single package (LOCAL + MCP + REMOTE)</div>
 
     <div class="container">
-        <!-- Mic Button -->
+        <!-- Library load status -->
+        <div class="card">
+            <div class="card-title">Library Status</div>
+            <div id="loadStatus">Loading v8v-core...</div>
+        </div>
+
+        <!-- Mic -->
         <div class="card">
             <div class="mic-wrapper">
                 <button id="micBtn" class="mic-btn" onclick="toggleMic()">&#x1F3A4;</button>
@@ -192,21 +146,12 @@
             </div>
         </div>
 
-        <!-- Voice Commands -->
+        <!-- Commands -->
         <div class="card">
             <div class="card-title">Registered Commands</div>
-            <div class="command">
-                <span class="badge badge-local">LOCAL</span>
-                <span class="command-phrase">"add [item]" / "remove [item]" / "list todos"</span>
-            </div>
-            <div class="command">
-                <span class="badge badge-mcp">MCP</span>
-                <span class="command-phrase">"create task [item]" / "new task [item]"</span>
-            </div>
-            <div class="command">
-                <span class="badge badge-remote">REMOTE</span>
-                <span class="command-phrase">"notify [message]" / "alert [message]"</span>
-            </div>
+            <div class="command"><span class="badge badge-local">LOCAL</span><span class="command-phrase">"add [item]" / "remove [item]" / "list todos"</span></div>
+            <div class="command"><span class="badge badge-mcp">MCP</span><span class="command-phrase">"create task [item]" / "new task [item]"</span></div>
+            <div class="command"><span class="badge badge-remote">REMOTE</span><span class="command-phrase">"notify [message]" / "alert [message]"</span></div>
         </div>
 
         <!-- Settings -->
@@ -226,10 +171,8 @@
             </div>
             <div class="setting-row">
                 <label>Fuzzy: <span id="fuzzyValue">0.0</span></label>
-                <input type="range" id="fuzzySlider" min="0" max="1" step="0.1" value="0"
-                       oninput="updateFuzzy()">
+                <input type="range" id="fuzzySlider" min="0" max="1" step="0.1" value="0" oninput="updateFuzzy()">
             </div>
-
             <div class="card-title" style="margin-top: 0.75rem">Connectors</div>
             <div class="setting-row">
                 <label>MCP URL</label>
@@ -241,28 +184,6 @@
             </div>
         </div>
 
-        <!-- Fuzzy Matching Explanation -->
-        <div class="card">
-            <div class="card-title">How Fuzzy Matching Works</div>
-            <div class="fuzzy-explainer">
-                <strong>Pass 1 — Wildcard regex match:</strong><br>
-                Pattern <code>add * to todo</code> becomes regex <code>/^add (.+) to todo$/</code>.
-                If input matches exactly, confidence = 1.0 and <code>*</code> is the extracted text.<br><br>
-
-                <strong>Pass 2 — Dice similarity (when threshold > 0):</strong><br>
-                <code>Dice = (2 &times; |intersection|) / (|A| + |B|)</code><br><br>
-
-                Example: Input = "please add milk to todo list" (6 words)<br>
-                Pattern = "add * to todo" &rarr; literal words: {add, to, todo} (3 words)<br>
-                Intersection = {add, to, todo} = 3 matches<br>
-                <code>Dice = (2 &times; 3) / (6 + 3) = 0.67</code><br><br>
-
-                At threshold 0.5 &rarr; match. At 0.8 &rarr; no match.<br>
-                The formula <strong>penalizes filler words</strong>, so "add milk to todo" scores higher (0.86)
-                than "please could you add milk to my todo list" (0.50).
-            </div>
-        </div>
-
         <!-- Event Log -->
         <div class="card">
             <div class="card-title">Event Log</div>
@@ -270,6 +191,43 @@
         </div>
     </div>
 
+    <!-- Load Kotlin/JS UMD dependencies in order (from npm: v8v-core@0.3.0) -->
+    <!-- 1. Kotlin stdlib + atomicfu -->
+    <script src="node_modules/v8v-core/kotlin-kotlin-stdlib.js"></script>
+    <script src="node_modules/v8v-core/kotlin-kotlinx-atomicfu-runtime.js"></script>
+    <script src="node_modules/v8v-core/kotlin_org_jetbrains_kotlin_kotlin_dom_api_compat.js"></script>
+    <script src="node_modules/v8v-core/kotlinx-atomicfu.js"></script>
+
+    <!-- 2. Coroutines -->
+    <script src="node_modules/v8v-core/kotlinx-coroutines-core.js"></script>
+
+    <!-- 3. Kotlinx IO -->
+    <script src="node_modules/v8v-core/kotlinx-io-kotlinx-io-bytestring.js"></script>
+    <script src="node_modules/v8v-core/kotlinx-io-kotlinx-io-core.js"></script>
+
+    <!-- 4. Kotlinx Serialization -->
+    <script src="node_modules/v8v-core/kotlinx-serialization-kotlinx-serialization-core.js"></script>
+    <script src="node_modules/v8v-core/kotlinx-serialization-kotlinx-serialization-json.js"></script>
+    <script src="node_modules/v8v-core/kotlinx-serialization-kotlinx-serialization-json-io.js"></script>
+
+    <!-- 5. Ktor (utils → io → http → shared → client) -->
+    <script src="node_modules/v8v-core/ktor-ktor-utils.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-io.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-http.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-shared-ktor-events.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-shared-ktor-serialization.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-shared-ktor-serialization-ktor-serialization-kotlinx.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-shared-ktor-serialization-ktor-serialization-kotlinx-ktor-serialization-kotlinx-json.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-shared-ktor-websockets.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-shared-ktor-websocket-serialization.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-shared-ktor-sse.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-client-ktor-client-core.js"></script>
+    <script src="node_modules/v8v-core/ktor-ktor-client-ktor-client-plugins-ktor-client-content-negotiation.js"></script>
+
+    <!-- 6. V8V core (depends on everything above) -->
+    <script src="node_modules/v8v-core/v8v-core.js"></script>
+
+    <!-- 7. App logic -->
     <script src="app.js"></script>
 </body>
 </html>

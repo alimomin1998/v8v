@@ -20,6 +20,7 @@ class LocalActionHandler(
             ActionResult.Success(
                 scope = ActionScope.LOCAL,
                 intent = intent.intent,
+                message = intent.extractedText,
             )
         } catch (e: Exception) {
             ActionResult.Error(
