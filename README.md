@@ -745,20 +745,6 @@ node example-mcp-server/server.js --port 4000
 See [example-mcp-server/README.md](example-mcp-server/README.md) for full docs.
 
 ---
-
-## Publishing & Distribution
-
-See [PUBLISHING.md](PUBLISHING.md) for full instructions on publishing to:
-- **Maven Central** (Android / Kotlin / JVM)
-- **npm** (Web / JS / TS)
-- **GitHub Releases + SPM** (iOS / macOS)
-
-Automated release: `./scripts/release.sh 0.3.0`
-
-Tag-based CI publishing: push a `v*` tag to trigger the publish workflow.
-
----
-
 ## License
 
 ```
