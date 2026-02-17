@@ -3,10 +3,8 @@
 package io.v8v.poc
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.v8v.core.ActionResult
 import io.v8v.core.AgentState
 import io.v8v.core.VoiceAgentCallbacks
 import io.v8v.core.createPlatformEngine
@@ -16,8 +14,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
-
+class MainViewModel(
+    application: Application
+) : AndroidViewModel(application) {
     private companion object {
         const val TAG = "V8V-Example"
         const val MCP_PORT = 3001
@@ -65,10 +64,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Uses VoiceAgentCallbacks — the same callback-based API as
      * iOS/macOS (Swift) and Web (VoiceAgentJs).
      */
-    private val agent = VoiceAgentCallbacks(
-        engine = createPlatformEngine(application.applicationContext),
-        config = VoiceAgentConfig(),
-    )
+    private val agent =
+        VoiceAgentCallbacks(
+            engine = createPlatformEngine(application.applicationContext),
+            config = VoiceAgentConfig(),
+        )
 
     init {
         mockMcpServer.start()
@@ -107,10 +107,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // LOCAL: "add <item>" → in-app todo list
         agent.registerLocalAction(
             intent = "todo.add",
-            phrases = mapOf(
-                "en" to listOf("add *", "add * to todo", "add * to my list"),
-                "hi" to listOf("* todo mein add karo", "todo mein * add karo"),
-            ),
+            phrases =
+                mapOf(
+                    "en" to listOf("add *", "add * to todo", "add * to my list"),
+                    "hi" to listOf("* todo mein add karo", "todo mein * add karo"),
+                ),
         ) { resolved ->
             _todos.value = _todos.value + resolved.extractedText
             _lastTranscript.value = resolved.rawText
@@ -133,16 +134,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startListening() = agent.start()
+
     fun stopListening() = agent.stop()
 
-    fun setLanguage(lang: String) { _language.value = lang; applyConfig() }
-    fun setContinuous(enabled: Boolean) { _continuous.value = enabled; applyConfig() }
-    fun setFuzzyThreshold(value: Float) { _fuzzyThreshold.value = value; applyConfig() }
+    fun setLanguage(lang: String) {
+        _language.value = lang
+        applyConfig()
+    }
+
+    fun setContinuous(enabled: Boolean) {
+        _continuous.value = enabled
+        applyConfig()
+    }
+
+    fun setFuzzyThreshold(value: Float) {
+        _fuzzyThreshold.value = value
+        applyConfig()
+    }
 
     fun removeTodo(index: Int) {
-        _todos.value = _todos.value.toMutableList().apply {
-            if (index in indices) removeAt(index)
-        }
+        _todos.value =
+            _todos.value.toMutableList().apply {
+                if (index in indices) removeAt(index)
+            }
     }
 
     fun setWebhookUrl(url: String) {
@@ -177,10 +191,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _debugLog.value = (_debugLog.value + line).takeLast(20)
     }
 
-    private fun scopeOf(intent: String): String = when {
-        intent.startsWith("todo.") -> "LOCAL"
-        intent.startsWith("task.") -> "MCP"
-        intent.startsWith("notify.") -> "REMOTE"
-        else -> "LOCAL"
-    }
+    private fun scopeOf(intent: String): String =
+        when {
+            intent.startsWith("todo.") -> "LOCAL"
+            intent.startsWith("task.") -> "MCP"
+            intent.startsWith("notify.") -> "REMOTE"
+            else -> "LOCAL"
+        }
 }

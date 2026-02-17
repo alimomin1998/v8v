@@ -103,34 +103,39 @@ fun VoiceAgentScreen(vm: MainViewModel = viewModel()) {
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
-                ctx, Manifest.permission.RECORD_AUDIO,
+                ctx,
+                Manifest.permission.RECORD_AUDIO,
             ) == PackageManager.PERMISSION_GRANTED,
         )
     }
 
     LaunchedEffect(Unit) {
         hasPermission = ContextCompat.checkSelfPermission(
-            ctx, Manifest.permission.RECORD_AUDIO,
+            ctx,
+            Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        hasPermission = granted
-        if (granted) vm.startListening()
-    }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            hasPermission = granted
+            if (granted) vm.startListening()
+        }
 
-    val isListening = agentState == AgentState.LISTENING ||
-        agentState == AgentState.PROCESSING
+    val isListening =
+        agentState == AgentState.LISTENING ||
+            agentState == AgentState.PROCESSING
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("V8V Example") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ),
             )
         },
         floatingActionButton = {
@@ -144,20 +149,22 @@ fun VoiceAgentScreen(vm: MainViewModel = viewModel()) {
         },
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
         ) {
             Spacer(Modifier.height(8.dp))
 
             // Library badge
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                ),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    ),
             ) {
                 Column(Modifier.padding(12.dp)) {
                     Text(
@@ -222,15 +229,23 @@ fun VoiceAgentScreen(vm: MainViewModel = viewModel()) {
 // ── Mic FAB ─────────────────────────────────────────────────────────
 
 @Composable
-private fun MicFab(isListening: Boolean, audioLevel: Float, onClick: () -> Unit) {
+private fun MicFab(
+    isListening: Boolean,
+    audioLevel: Float,
+    onClick: () -> Unit
+) {
     val fabColor by animateColorAsState(
-        if (isListening) MaterialTheme.colorScheme.error
-        else MaterialTheme.colorScheme.primary,
+        if (isListening) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.primary
+        },
         label = "fab",
     )
     val level by animateFloatAsState(
         if (isListening) audioLevel else 0f,
-        animationSpec = tween(100), label = "level",
+        animationSpec = tween(100),
+        label = "level",
     )
     val ringScale = 1f + level * 0.8f
     val ringAlpha = if (isListening) 0.15f + level * 0.25f else 0f
@@ -271,9 +286,10 @@ private fun SettingsCard(vm: MainViewModel) {
 
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            ),
     ) {
         Column(Modifier.padding(12.dp)) {
             Text("Settings", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -294,7 +310,10 @@ private fun SettingsCard(vm: MainViewModel) {
                     langs.forEach { (code, label) ->
                         DropdownMenuItem(
                             text = { Text(label) },
-                            onClick = { vm.setLanguage(code); expanded = false },
+                            onClick = {
+                                vm.setLanguage(code)
+                                expanded = false
+                            },
                         )
                     }
                 }
@@ -331,7 +350,10 @@ private fun CommandsCard() {
 }
 
 @Composable
-private fun CmdRow(scope: String, example: String) {
+private fun CmdRow(
+    scope: String,
+    example: String
+) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         ScopeBadge(scope)
         Spacer(Modifier.width(8.dp))
@@ -341,12 +363,13 @@ private fun CmdRow(scope: String, example: String) {
 
 @Composable
 private fun ScopeBadge(scope: String) {
-    val color = when (scope) {
-        "LOCAL" -> MaterialTheme.colorScheme.primary
-        "MCP" -> MaterialTheme.colorScheme.tertiary
-        "REMOTE" -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.outline
-    }
+    val color =
+        when (scope) {
+            "LOCAL" -> MaterialTheme.colorScheme.primary
+            "MCP" -> MaterialTheme.colorScheme.tertiary
+            "REMOTE" -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.outline
+        }
     Surface(shape = MaterialTheme.shapes.extraSmall, color = color.copy(alpha = 0.15f)) {
         Text(
             scope,
@@ -361,16 +384,21 @@ private fun ScopeBadge(scope: String) {
 // ── Status Card ─────────────────────────────────────────────────────
 
 @Composable
-private fun StatusCard(state: AgentState, transcript: String) {
+private fun StatusCard(
+    state: AgentState,
+    transcript: String
+) {
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = when (state) {
-                AgentState.LISTENING -> MaterialTheme.colorScheme.primaryContainer
-                AgentState.PROCESSING -> MaterialTheme.colorScheme.tertiaryContainer
-                AgentState.IDLE -> MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    when (state) {
+                        AgentState.LISTENING -> MaterialTheme.colorScheme.primaryContainer
+                        AgentState.PROCESSING -> MaterialTheme.colorScheme.tertiaryContainer
+                        AgentState.IDLE -> MaterialTheme.colorScheme.surfaceVariant
+                    },
+            ),
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(
@@ -397,11 +425,16 @@ private fun StatusCard(state: AgentState, transcript: String) {
 // ── Todo Item ───────────────────────────────────────────────────────
 
 @Composable
-private fun TodoItem(text: String, scope: String, onDelete: () -> Unit) {
+private fun TodoItem(
+    text: String,
+    scope: String,
+    onDelete: () -> Unit
+) {
     Card(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-            Arrangement.SpaceBetween, Alignment.CenterVertically,
+            Arrangement.SpaceBetween,
+            Alignment.CenterVertically,
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 ScopeBadge(scope)
@@ -422,7 +455,11 @@ private fun WebhookUrlField(vm: MainViewModel) {
     val url by vm.webhookUrl.collectAsState()
     var text by remember { mutableStateOf(url) }
     OutlinedTextField(
-        text, { text = it; vm.setWebhookUrl(it) },
+        text,
+        {
+            text = it
+            vm.setWebhookUrl(it)
+        },
         label = { Text("n8n Webhook URL (REMOTE)") },
         placeholder = { Text("https://n8n.example.com/webhook/voice") },
         singleLine = true,
@@ -440,18 +477,35 @@ private fun DebugPanel(lines: List<String>) {
         Column(Modifier.padding(12.dp)) {
             Row(
                 Modifier.fillMaxWidth().clickable { open = !open },
-                Arrangement.SpaceBetween, Alignment.CenterVertically,
+                Arrangement.SpaceBetween,
+                Alignment.CenterVertically,
             ) {
-                Text("Debug Log (${lines.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Text(if (open) "Hide" else "Show", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    "Debug Log (${lines.size})",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    if (open) "Hide" else "Show",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
             AnimatedVisibility(open, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                 Column(Modifier.padding(top = 4.dp)) {
                     if (lines.isEmpty()) {
-                        Text("No logs yet", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "No logs yet",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     } else {
                         lines.forEach {
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
